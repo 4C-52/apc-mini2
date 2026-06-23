@@ -4,9 +4,8 @@ import time
 import threading
 import websocket
 
-
 class Dot2WebSocketHandler:
-    def __init__(self, host="10.0.0.50", username="remote", password="1", heartbeat_step=10, debug=False):
+    def __init__(self, host="10.0.0.50", username="remote", password="1", heartbeat_step=10, debug=False, start_index=[0, 100, 200, 300, 400, 500, 600, 700, 800], items_count=[22, 22, 22, 16, 16, 16, 16, 16, 16]):
         self.HOST = host
         self.URL = f"ws://{self.HOST}/?ma=1"
         self.ORIGIN = f"http://{self.HOST}"
@@ -22,6 +21,96 @@ class Dot2WebSocketHandler:
         self.ws = None
         self._ws_thread = None
         self._heartbeat_thread = None
+
+        # Callback registry: { "requestType": [callable, ...] }
+        self._callbacks = {}
+        # One-shot callbacks waiting for next matching message
+        self._one_shot_callbacks = {}
+        self._callbacks_lock = threading.Lock()
+
+        self.START_INDEX = start_index
+        self.ITEMS_COUNT = items_count
+
+    ###################################################
+    #                    Callbacks                    #
+    ###################################################
+
+    def on(self, request_type, callback):
+        """
+        Register a persistent callback for a given requestType (or any key in the response).
+        The callback receives the full parsed message dict.
+
+        Example:
+            dot2_ws.on("playbacks", handle_playbacks)
+        """
+        with self._callbacks_lock:
+            if request_type not in self._callbacks:
+                self._callbacks[request_type] = []
+            self._callbacks[request_type].append(callback)
+
+    def off(self, request_type, callback=None):
+        """
+        Remove a persistent callback.
+        If callback is None, removes all callbacks for that request_type.
+        """
+        with self._callbacks_lock:
+            if request_type not in self._callbacks:
+                return
+            if callback is None:
+                del self._callbacks[request_type]
+            else:
+                self._callbacks[request_type] = [
+                    cb for cb in self._callbacks[request_type] if cb != callback
+                ]
+
+    def once(self, request_type, callback):
+        """
+        Register a one-shot callback that fires only on the next matching message then removes itself.
+
+        Example:
+            dot2_ws.once("playbacks", handle_single_playback_response)
+        """
+        with self._callbacks_lock:
+            if request_type not in self._one_shot_callbacks:
+                self._one_shot_callbacks[request_type] = []
+            self._one_shot_callbacks[request_type].append(callback)
+
+    def _dispatch(self, data):
+        # Build the set of keys to match against
+        keys_to_check = set(data.keys())
+
+        # Also add the value of responseType as a matchable key
+        if "responseType" in data:
+            keys_to_check.add(data["responseType"])
+
+        with self._callbacks_lock:
+            persistent = {k: list(v) for k, v in self._callbacks.items()}
+            one_shot = {k: list(v) for k, v in self._one_shot_callbacks.items()}
+            for key in one_shot:
+                if key in keys_to_check:
+                    self._one_shot_callbacks.pop(key, None)
+
+        for key, callbacks in persistent.items():
+            if key in keys_to_check:
+                for cb in callbacks:
+                    try:
+                        cb(data)
+                    except Exception as e:
+                        if self.DEBUG:
+                            print(f"Callback error [{key}]: {e}")
+
+        for key, callbacks in one_shot.items():
+            if key in keys_to_check:
+                for cb in callbacks:
+                    try:
+                        cb(data)
+                    except Exception as e:
+                        if self.DEBUG:
+                            print(f"One-shot callback error [{key}]: {e}")
+
+    ###################################################
+    #                   WS Internals                  #
+    ###################################################
 
     def _send(self, obj):
         if self.ws:
@@ -42,6 +131,7 @@ class Dot2WebSocketHandler:
         if self.DEBUG:
             print("<<", data)
 
+        # Internal handshake handling
         if data.get("status") == "server ready":
             self._send({"session": 0})
             return
@@ -70,6 +160,10 @@ class Dot2WebSocketHandler:
             else:
                 if self.DEBUG:
                     print("Login FAILED")
+            return
+
+        # Dispatch to user callbacks
+        self._dispatch(data)
 
     def _on_error(self, ws, err):
         if self.DEBUG:
@@ -78,6 +172,10 @@ class Dot2WebSocketHandler:
     def _on_close(self, ws, code, reason):
         if self.DEBUG:
             print("CLOSE", code, reason)
+
+    ###################################################
+    #                   Public API                    #
+    ###################################################
 
     def connect(self):
         self.ws = websocket.WebSocketApp(
@@ -88,7 +186,10 @@ class Dot2WebSocketHandler:
             on_error=self._on_error,
             on_close=self._on_close
         )
-        self._ws_thread = threading.Thread(target=lambda: self.ws.run_forever(skip_utf8_validation=True), daemon=True)
+        self._ws_thread = threading.Thread(
+            target=lambda: self.ws.run_forever(skip_utf8_validation=True),
+            daemon=True
+        )
         self._ws_thread.start()
         self._heartbeat_thread = threading.Thread(target=self._heartbeat, daemon=True)
         self._heartbeat_thread.start()
@@ -99,85 +200,62 @@ class Dot2WebSocketHandler:
             if self.session_id is not None:
                 self._send({"session": self.session_id})
 
-    def send_playback_click(self, executor_index, page_index=0, button_id=0, ptype=0, pressed=True):
-        if not self.logged_in or self.session_id is None:
-            if self.DEBUG:
-                print("Not ready (login/session); cannot send userInput yet.")
-            return
-
-        press = {
-            "requestType": "playbacks_userInput",
-            "cmdline": "",
-            "execIndex": int(executor_index),
-            "pageIndex": page_index,
-            "buttonId": button_id,
-            "pressed": True,
-            "released": False,
-            "type": ptype,
-            "session": self.session_id,
-            "maxRequests": 0
-        }
-        release = {
-            "requestType": "playbacks_userInput",
-            "cmdline": "",
-            "execIndex": int(executor_index),
-            "pageIndex": page_index,
-            "buttonId": button_id,
-            "pressed": False,
-            "released": True,
-            "type": ptype,
-            "session": self.session_id,
-            "maxRequests": 0
-        }
-
-        if pressed:
-            if self.DEBUG:
-                print("Pressed")
-            self._send(press)
-        else:
-            if self.DEBUG:
-                print("Released")
-            self._send(release)
-
-    def poll(self):
-        if self.session_id is None:
-            if self.DEBUG:
-                print("No session yet")
-            return
-        self._send({
-            "requestType": "getdata",
-            "data": "set,clear,high",
-            "session": self.session_id,
-            "maxRequests": 1
-        })
-
     def disconnect(self):
         self.stop_heartbeat = True
         if self.ws:
             self.ws.close()
 
+    def send_playback_click(self, executor_index, page_index=0, button_id=0, ptype=0, pressed=True):
+        if not self.logged_in or self.session_id is None:
+            if self.DEBUG:
+                print("Not ready; cannot send userInput yet.")
+            return
+
+        payload = {
+            "requestType": "playbacks_userInput",
+            "cmdline": "",
+            "execIndex": int(executor_index),
+            "pageIndex": page_index,
+            "buttonId": button_id,
+            "pressed": pressed,
+            "released": not pressed,
+            "type": ptype,
+            "session": self.session_id,
+            "maxRequests": 0
+        }
+        self._send(payload)
+
     def send_playback_fader(self, fader_index, fader_value, page_index=1, type=1):
         if not self.logged_in or self.session_id is None:
             if self.DEBUG:
-                print("Not ready (login/session); cannot send userInput yet.")
+                print("Not ready; cannot send userInput yet.")
             return
 
-        """if fader_value > 0: # Initiate fader in dot2
-            self._send({"keyname":"ON","value":1,"cmdlineText":"","session":self.session_id,"requestType":"keyname","maxRequests":0})
-            self._send({"keyname":"ON","value":0,"cmdlineText":"On","session":self.session_id,"requestType":"keyname","maxRequests":0})
-            self._send({"keyname":"EXEC","value":1,"session":self.session_id,"requestType":"keyname","maxRequests":0})
-            self._send({"keyname":"EXEC","value":0,"cmdlineText":"On Executor","session":self.session_id,"requestType":"keyname","maxRequests":0})
-            self._send({"keyname":str(fader_index),"value":1,"session":self.session_id,"requestType":"keyname","maxRequests":0})
-            self._send({"keyname":str(fader_index),"value":0,"cmdlineText":"On Executor 8","session":self.session_id,"requestType":"keyname","maxRequests":0})
-            self._send({"keyname":"ENTER","value":1,"session":self.session_id,"requestType":"keyname","maxRequests":0})
-            self._send({"keyname":"ENTER","value":0,"cmdlineText":"","session":self.session_id,"requestType":"keyname","maxRequests":0})"""
-
-        payload = {"requestType":"playbacks_userInput",
-                   "execIndex":fader_index,
-                   "pageIndex":page_index,
-                   "faderValue":fader_value/127,
-                   "type":type,
-                   "session":self.session_id,
-                   "maxRequests":0}
-
+        payload = {
+            "requestType": "playbacks_userInput",
+            "execIndex": fader_index,
+            "pageIndex": page_index,
+            "faderValue": fader_value / 127,
+            "type": type,
+            "session": self.session_id,
+            "maxRequests": 0
+        }
         self._send(payload)
+
+    def poll_exec_state(self):
+        if self.session_id is None:
+            if self.DEBUG:
+                print("No session yet")
+            return
+        self._send({
+        "requestType": "playbacks",
+        "startIndex": self.START_INDEX,
+        "itemsCount": self.ITEMS_COUNT,
+        "pageIndex": 0,
+        "itemsType": [3, 3, 3, 3, 3, 3, 3, 3, 3],
+        "view": 3,
+        "execButtonViewMode": 2,
+        "buttonsViewMode": 0,
+        "session": self.session_id,
+        "maxRequests": 1
+    })
