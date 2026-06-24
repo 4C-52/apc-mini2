@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This software allows you to easily link an **Akai APC Mini MK2** MIDI controller to a **GrandMA Dot2** lighting console via its WebSocket API. Each pad on the controller can be mapped to an executor on the Dot2, with customizable colors and multi-color cycling support.
+Tired of spending hours entering MidiNote commands in executors for it to not even handle blinking ? This tool is made for you, allows you to easily link an **Akai APC Mini MK2** MIDI controller to a **MA Dot2** lighting console via its WebSocket API. Each pad on the controller can be mapped to an executor on the Dot2, with customizable colors and multi-color cycling support.
 
 > ⚠️ **Note:** Special buttons and faders are not yet fully supported but will be implemented in a future update.
 
@@ -19,32 +19,44 @@ This software allows you to easily link an **Akai APC Mini MK2** MIDI controller
 pip install mido python-rtmidi websocket-client
 ```
 
-    ⚠️ Make sure to install python-rtmidi and not rtmidi — they are different packages and only python-rtmidi will work correctly with mido.
 
-Configuration
+> ⚠️ Make sure to install python-rtmidi and not rtmidi — they are different packages and only python-rtmidi will work correctly with mido.
+
+## Configuration
 
 Before running the software, open main.py and update the following variables at the top of the file:
 
 HOST = "192.168.0.11"       # Replace with your Dot2 console's IP address
+
 PLAINTEXT_PASSWORD = "1"    # Replace with the remote password set in Dot2
+> ⚠️ **Note:** This is a WIP, there will be TUI in the future with a setup screen and a compiled version of this software. 
+> This is a temporary solution
 
-    HOST: The IP address of your Dot2 console. You can find it in the console under Setup > Global Settings.
-    PLAINTEXT_PASSWORD: The password configured for remote access in Dot2.
+HOST: The IP address of your Dot2 console. You can find it in the console under Setup > Global Settings.
 
-How to Use
+PLAINTEXT_PASSWORD: The password configured for remote access in Dot2.
 
-    Launch your Dot2 console and make sure it is connected to the same network as your computer.
+![find_dot2_webremote_password_and_ip.gif](media/find_dot2_webremote_password_and_ip.gif)
 
-    Run the script:
+## How to Use
 
+Launch your Dot2 console or Dot2 on PC and make sure it is connected to the same network as your computer.
+
+Run the script in terminal:
+
+```bash
 python main.py
+```
+> ⚠️ **Note:** Again, this is a WIP, in the end you'll get a nice compiled file(py_installer) that installs the software on your pc and that you can launch like any other app
 
-    Select your MIDI ports when prompted — choose the same ports that are configured in Dot2 under Tools > MIDI Configuration.
+Select your MIDI ports when prompted — choose the same ports that are configured in Dot2 under Tools > MIDI Configuration.
 
-    Press any unassigned pad on the APC Mini MK2. The software will prompt you to:
-        Enter the executor number — you can find this by pressing the MA key on the Dot2 and hovering over the desired executor.
-        Enter the number of colors you want to assign to that pad.
-        Press the desired color(s) on the lit-up controller to confirm your selection.
+Press any unassigned pad on the APC Mini MK2. The software will prompt you to:
 
-    The pad is now linked to the executor. Press it to trigger the executor on the Dot2. If multiple colors were assigned, the pad will cycle through them while the executor is active.
+- Enter the executor number — you can find this by pressing the MA key on the Dot2 and hovering over the desired executor.
+- Enter the number of colors you want to assign to that pad.
+- Press the desired color(s) on the lit-up controller to confirm your selection.
 
+The pad is now linked to the executor. Press it to trigger the executor on the Dot2. If multiple colors were assigned, the pad will cycle through them while the executor is active.
+
+Enjoy! 😊
