@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import simpledialog, colorchooser
+from xml.dom.minidom import ProcessingInstruction
+
 import mido
 import json
 import time
@@ -11,8 +13,8 @@ DEBUG_MODE = True
 # Midi controller
 MIDI_INPORT = ""
 MIDI_OUTPORT = ""
-DEFAULT_INPUT_INDEX = None
-DEFAULT_OUTPUT_INDEX = None
+DEFAULT_INPUT_INDEX = 1
+DEFAULT_OUTPUT_INDEX = 3
 
 FADER_CC = (71, 72, 73, 74, 75, 76, 77, 78, 79)
 NORMAL_BUTTON_NOTES = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63)
@@ -97,6 +99,7 @@ def append_note_to_json(note, colors, executor_index, pulse_channel, type="norma
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
+#WIP
 def handle_playbacks(data):
     execs_states = {}
 
@@ -109,6 +112,7 @@ def handle_playbacks(data):
             if len(exec_cues) !=0:
                 execs_states[str(exec_id)] = True
 
+# WIP
 def check_on_exec(interval=2):
     executor_states = {}
     stored_execs = {}
@@ -292,7 +296,6 @@ def note_loop():
 def note_in_json(note):
     return str(note) in note_executor_dictionnary
 
-
 def update_button_color(note):
     """Background thread that cycles through multiple colors for a button."""
     note_str = str(note)
@@ -352,28 +355,70 @@ def turn_off_pad(pad_list="All"):
             MIDI_OUTPORT.send(msg)
 
 def update_colors():
-    for note_str in list(_stop_color_cycle.keys()):
-        _stop_color_cycle[note_str] = True
+    """Updates all colors of the pad including special buttons."""
 
-    # Build the set of notes we're about to light up
-    notes_to_update = set(int(n) for n in note_executor_dictionnary.keys())
-
-    # Only turn off pads that are NOT in the dictionary
-    pads_to_turn_off = [p for p in list(NORMAL_BUTTON_NOTES) + list(SPECIAL_BUTTON_NOTES)
-                        if p not in notes_to_update]
-    turn_off_pad(pads_to_turn_off)
+    if DEBUG_MODE:
+        print(f"\n================= Updating colors =================")
+    # Deactivate all pads for a clean start
+    print("Turning off all pads...")
+    deactivate_color_cycles("All")
+    turn_off_pad("All")
+    print(print("Pads turned off.\n"))
 
     for button in note_executor_dictionnary:
+
         note_str = str(button)
         colors = note_executor_dictionnary[note_str]["colors"]
-        intensity = DEFAULT_BRIGHTNESS_LEVEL
-        first_velocity = colors[0]
+        button_type = note_executor_dictionnary[note_str]["type"]
+        if DEBUG_MODE:
+            print(f"\n================= Button [{button}] =================")
+            print(f"Updating colors for button [{button}]...")
+            print(f"note_str = {note_str}")
+            print(f"colors = {colors}")
+            print(f"button_type = {button_type}\n")
 
-        msg = mido.Message('note_on', channel=int(intensity), note=int(note_str), velocity=int(first_velocity))
-        MIDI_OUTPORT.send(msg)
+        #Handles different button types
+        if button_type == "normal":
+            intensity = DEFAULT_BRIGHTNESS_LEVEL
+            first_velocity = colors[0]
+            if DEBUG_MODE:
+                print(f"first_velocity = {first_velocity}\nIntensity = {intensity}")
 
-        if len(colors) > 1:
-            _start_color_cycle(note_str)
+            # Send Midi Message(Update First Color)
+            if DEBUG_MODE:
+                print(f"Sending message to button, color updating...")
+            msg = mido.Message('note_on', channel=int(intensity), note=int(note_str), velocity=int(first_velocity))
+            MIDI_OUTPORT.send(msg)
+            if DEBUG_MODE:
+                print(f"Message sent to the button, color updated.")
+
+
+            if DEBUG_MODE:
+                print(f"Initiating color cycle...")
+            if len(colors) > 1:
+                _start_color_cycle(note_str)
+            if DEBUG_MODE:
+                print(f"Color cycle initiated.")
+
+
+
+        elif button_type == "special":
+            intensity = 1
+
+            if DEBUG_MODE:
+                print(f"Sending message to button, color updating...")
+            msg = mido.Message('note_on', channel=int(intensity), note=int(note_str), velocity=int(1))
+            MIDI_OUTPORT.send(msg)
+            if DEBUG_MODE:
+                print(f"Message sent to the button, color updated.")
+
+        elif button_type == "shift":
+            pass
+            #shift key doesn't have an LED
+        print(f"================= Button [{button}] =================\n")
+
+    if DEBUG_MODE:
+        print(f"================= Colors Updated =================")
 
 def deactivate_color_cycles(notes_to_deactivate="All"):
     if notes_to_deactivate == "All":

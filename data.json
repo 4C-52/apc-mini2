@@ -406,6 +406,14 @@
       "pulse_channel": 10,
       "type": "normal"
     },
+    "104": {
+      "executor_index": 104,
+      "colors": [
+        1
+      ],
+      "pulse_channel": 1,
+      "type": "special"
+    },
     "112": {
       "executor_index": 100,
       "colors": [
