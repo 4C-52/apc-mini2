@@ -382,6 +382,33 @@
       "pulse_channel": 10,
       "type": "normal"
     },
+    "53": {
+      "executor_index": 410,
+      "colors": [
+        3,
+        70
+      ],
+      "pulse_channel": 10,
+      "type": "normal"
+    },
+    "54": {
+      "executor_index": 409,
+      "colors": [
+        3,
+        70
+      ],
+      "pulse_channel": 10,
+      "type": "normal"
+    },
+    "55": {
+      "executor_index": 408,
+      "colors": [
+        3,
+        70
+      ],
+      "pulse_channel": 10,
+      "type": "normal"
+    },
     "56": {
       "executor_index": 315,
       "colors": [
@@ -406,6 +433,42 @@
       "pulse_channel": 10,
       "type": "normal"
     },
+    "60": {
+      "executor_index": 612,
+      "colors": [
+        77,
+        94
+      ],
+      "pulse_channel": 10,
+      "type": "normal"
+    },
+    "61": {
+      "executor_index": 310,
+      "colors": [
+        3,
+        70
+      ],
+      "pulse_channel": 10,
+      "type": "normal"
+    },
+    "62": {
+      "executor_index": 309,
+      "colors": [
+        3,
+        70
+      ],
+      "pulse_channel": 10,
+      "type": "normal"
+    },
+    "63": {
+      "executor_index": 308,
+      "colors": [
+        3,
+        70
+      ],
+      "pulse_channel": 10,
+      "type": "normal"
+    },
     "104": {
       "executor_index": 104,
       "colors": [
@@ -416,6 +479,22 @@
     },
     "112": {
       "executor_index": 100,
+      "colors": [
+        1
+      ],
+      "pulse_channel": 1,
+      "type": "special"
+    },
+    "114": {
+      "executor_index": 102,
+      "colors": [
+        1
+      ],
+      "pulse_channel": 1,
+      "type": "special"
+    },
+    "115": {
+      "executor_index": 103,
       "colors": [
         1
       ],

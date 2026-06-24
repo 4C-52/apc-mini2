@@ -346,7 +346,7 @@ def turn_off_pad(pad_list="All"):
 
         # turn special pads
         for pad in SPECIAL_BUTTON_NOTES:
-            msg = mido.Message('note_on', channel=6, note=pad, velocity=0)
+            msg = mido.Message('note_on', channel=1, note=pad, velocity=0)
             MIDI_OUTPORT.send(msg)
     else:
         # turn off given pads
@@ -407,7 +407,7 @@ def update_colors():
 
             if DEBUG_MODE:
                 print(f"Sending message to button, color updating...")
-            msg = mido.Message('note_on', channel=int(intensity), note=int(note_str), velocity=int(1))
+            msg = mido.Message('note_on', channel=0, note=int(note_str), velocity=1) # Channel 0 is the only channel that should be used with special buttons
             MIDI_OUTPORT.send(msg)
             if DEBUG_MODE:
                 print(f"Message sent to the button, color updated.")
