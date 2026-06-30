@@ -1,7 +1,7 @@
 {
   "default_brightness_level": 6,
   "color_cycle_interval": 1,
-  "note_executor_dictionnary": {
+  "note_executor_dictionary": {
     "0": {
       "executor_index": 807,
       "colors": [
@@ -141,17 +141,7 @@
     "16": {
       "executor_index": 607,
       "colors": [
-        112,
-        103
-      ],
-      "pulse_channel": 10,
-      "type": "normal"
-    },
-    "17": {
-      "executor_index": 606,
-      "colors": [
-        93,
-        115
+        48
       ],
       "pulse_channel": 10,
       "type": "normal"
@@ -159,8 +149,7 @@
     "20": {
       "executor_index": 603,
       "colors": [
-        68,
-        104
+        74
       ],
       "pulse_channel": 10,
       "type": "normal"
@@ -168,7 +157,7 @@
     "21": {
       "executor_index": 602,
       "colors": [
-        70
+        103
       ],
       "pulse_channel": 10,
       "type": "normal"
@@ -176,7 +165,7 @@
     "22": {
       "executor_index": 601,
       "colors": [
-        117
+        103
       ],
       "pulse_channel": 10,
       "type": "normal"
@@ -184,7 +173,7 @@
     "23": {
       "executor_index": 600,
       "colors": [
-        71
+        103
       ],
       "pulse_channel": 10,
       "type": "normal"
@@ -192,8 +181,15 @@
     "24": {
       "executor_index": 507,
       "colors": [
-        111,
-        73
+        65
+      ],
+      "pulse_channel": 10,
+      "type": "normal"
+    },
+    "25": {
+      "executor_index": 506,
+      "colors": [
+        113
       ],
       "pulse_channel": 10,
       "type": "normal"
@@ -201,7 +197,7 @@
     "29": {
       "executor_index": 502,
       "colors": [
-        70
+        3
       ],
       "pulse_channel": 10,
       "type": "normal"
@@ -209,7 +205,7 @@
     "30": {
       "executor_index": 501,
       "colors": [
-        117
+        3
       ],
       "pulse_channel": 10,
       "type": "normal"
@@ -382,33 +378,6 @@
       "pulse_channel": 10,
       "type": "normal"
     },
-    "53": {
-      "executor_index": 410,
-      "colors": [
-        3,
-        70
-      ],
-      "pulse_channel": 10,
-      "type": "normal"
-    },
-    "54": {
-      "executor_index": 409,
-      "colors": [
-        3,
-        70
-      ],
-      "pulse_channel": 10,
-      "type": "normal"
-    },
-    "55": {
-      "executor_index": 408,
-      "colors": [
-        3,
-        70
-      ],
-      "pulse_channel": 10,
-      "type": "normal"
-    },
     "56": {
       "executor_index": 315,
       "colors": [
@@ -433,68 +402,64 @@
       "pulse_channel": 10,
       "type": "normal"
     },
-    "60": {
-      "executor_index": 612,
+    "100": {
+      "executor_index": 8,
       "colors": [
-        77,
-        94
+        1
       ],
-      "pulse_channel": 10,
-      "type": "normal"
+      "pulse_channel": 1,
+      "type": "special"
     },
-    "61": {
-      "executor_index": 310,
+    "101": {
+      "executor_index": 7,
       "colors": [
-        3,
-        70
+        1
       ],
-      "pulse_channel": 10,
-      "type": "normal"
+      "pulse_channel": 1,
+      "type": "special"
     },
-    "62": {
-      "executor_index": 309,
+    "102": {
+      "executor_index": 6,
       "colors": [
-        3,
-        70
+        1
       ],
-      "pulse_channel": 10,
-      "type": "normal"
+      "pulse_channel": 1,
+      "type": "special"
     },
-    "63": {
-      "executor_index": 308,
+    "103": {
+      "executor_index": 5,
       "colors": [
-        3,
-        70
+        1
       ],
-      "pulse_channel": 10,
-      "type": "normal"
+      "pulse_channel": 1,
+      "type": "special"
     },
     "104": {
-      "executor_index": 104,
+      "executor_index": 4,
       "colors": [
         1
       ],
       "pulse_channel": 1,
       "type": "special"
     },
-    "112": {
-      "executor_index": 100,
+    "105": {
+      "executor_index": 3,
       "colors": [
         1
       ],
       "pulse_channel": 1,
       "type": "special"
     },
-    "114": {
-      "executor_index": 102,
+    "106": {
+      "executor_index": 2,
       "colors": [
         1
       ],
       "pulse_channel": 1,
       "type": "special"
     },
-    "115": {
-      "executor_index": 103,
+    "107": {
+      "executor_index": 1,
       "colors": [
         1
       ],

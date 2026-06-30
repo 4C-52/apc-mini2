@@ -13,18 +13,18 @@ DEBUG_MODE = True
 # Midi controller
 MIDI_INPORT = ""
 MIDI_OUTPORT = ""
-DEFAULT_INPUT_INDEX = 1
-DEFAULT_OUTPUT_INDEX = 3
+DEFAULT_INPUT_INDEX = None
+DEFAULT_OUTPUT_INDEX = None
 
 FADER_CC = (71, 72, 73, 74, 75, 76, 77, 78, 79)
 NORMAL_BUTTON_NOTES = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63)
 SPECIAL_BUTTON_NOTES = (100, 101, 102, 103, 104, 105, 106, 107, 112, 113, 114, 115, 116, 117, 118, 119)
-SHIFT_KEY = (122)
+SHIFT_KEY = 122
 
-note_executor_dictionnary = {}
+note_executor_dictionary = {}
 BUTTON_COLORS = [107, 108, 96, 84, 60, 106, 120, 5, 89, 28, 29, 90, 77, 94, 57, 56, 105, 63, 111, 110, 73, 16, 20, 24, 97, 62, 100, 99, 109, 12, 113, 8, 64, 76, 21, 25, 75, 98, 74, 13, 104, 69, 41, 66, 68, 65, 102, 101, 93, 115, 70, 3, 117, 71, 112, 103, 114, 32, 36, 40, 91, 92, 44, 48]
 DEFAULT_BRIGHTNESS_LEVEL = 6
-COLOR_CYCLE_INTERVAL = 0.5
+COLOR_CYCLE_INTERVAL = 0.2
 
 # Color cycling thread tracking
 _color_cycle_threads = {}
@@ -33,6 +33,8 @@ _stop_color_cycle = {}
 executor_states = {}
 _executor_states_lock = threading.Lock()
 execs_currently_on = []
+EXEC_STATE_CHECK_INTERVAL = 0.5
+executor_states_thread = ""
 
 # Dot2 Web Socket
 HOST = "192.168.0.11"
@@ -61,155 +63,139 @@ def input(prompt=""):
     root = tk.Tk()
     root.withdraw()
     result = simpledialog.askstring("Input", prompt)
+    print(result)
     root.destroy()
     return result
 
 def load_json():
-    global note_executor_dictionnary, cc_executor_dictionnary, BUTTON_COLORS, DEFAULT_BRIGHTNESS_LEVEL, COLOR_CYCLE_INTERVAL
+    global note_executor_dictionary, BUTTON_COLORS, DEFAULT_BRIGHTNESS_LEVEL, COLOR_CYCLE_INTERVAL
 
     with open("data.json", "r") as data:
         data = json.load(data)
 
-    note_executor_dictionnary = data["note_executor_dictionnary"]
+    note_executor_dictionary = data["note_executor_dictionary"]
     DEFAULT_BRIGHTNESS_LEVEL = data["default_brightness_level"]
     COLOR_CYCLE_INTERVAL = data.get("color_cycle_interval", 1)
 
     if DEBUG_MODE:
         print('================= JSON LOAD =================')
-        print(f'Note executor dictionnary :', note_executor_dictionnary)
+        print(f'Note executor dictionary :', note_executor_dictionary)
         print(f'Default brightness level :', DEFAULT_BRIGHTNESS_LEVEL)
         print(f'Color cycle interval :', COLOR_CYCLE_INTERVAL)
         print('================= JSON LOAD =================\n')
 
-def append_note_to_json(note, colors, executor_index, pulse_channel, type="normal", filepath="data.json"):
+def append_note_to_json(note, colors, executor_index, pulse_channel, pad_type="normal", filepath="data.json"):
     with open(filepath, "r") as f:
         data = json.load(f)
 
-    data["note_executor_dictionnary"][str(note)] = {
+    data["note_executor_dictionary"][str(note)] = {
         "executor_index": executor_index,
         "colors": colors,
         "pulse_channel": pulse_channel,
-        "type": type
+        "type": pad_type
     }
 
-    data["note_executor_dictionnary"] = dict(
-        sorted(data["note_executor_dictionnary"].items(), key=lambda x: int(x[0]))
+    data["note_executor_dictionary"] = dict(
+        sorted(data["note_executor_dictionary"].items(), key=lambda x: int(x[0]))
     )
 
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
+def note_in_json(note):
+    return str(note) in note_executor_dictionary
+
 #WIP
 def handle_playbacks(data):
+    """
+    Triggers when dot2_ws.poll_exec_state() is called and parses data to output a dictionary in this format :
+    {"Exec_id": True, ...}
+    True if the exec is on in Dot2
+    Does not contain off execs
+    :param data:
+    :return:
+    """
     execs_states = {}
-
-    items_group = data.get("items_group")
+    print("O"*50, data)
+    items_group = data["itemGroups"]
     for exec_line in items_group:
-        for exec in exec_line:
-            exec_id = exec[0]["i"]["t"]
-            exec_cues = exec[0]["cues"]["items"][0]["pgs"]
+        print(exec_line, "exec line")
+        i_exec_off = exec_line["iExecOff"]
+        for exec_struct in exec_line["items"]:
+            print("exec", exec_struct)
+            exec_id = exec_struct[0]["i"]["t"]
+            if int(exec_id) < i_exec_off:
+                exec_id = int(exec_id) + i_exec_off
+            if exec_struct[0]['cues'] != {}:
 
-            if len(exec_cues) !=0:
+                exec_cues = exec_struct[0]['cues']["items"][1]['pgs']['v']
+            else:
+                exec_cues = {}
+
+            print("exec cues", exec_cues)
+            print("exec_id", exec_id)
+
+            if exec_cues>1:
                 execs_states[str(exec_id)] = True
+    print(execs_states)
+    return execs_states
 
 # WIP
-def check_on_exec(interval=2):
-    executor_states = {}
-    stored_execs = {}
+def check_exec_state():
+    global executor_states # stores the last states of the executor
 
-    #Initiate a dictionnary with execs turned off by default
-    for note in note_executor_dictionnary.keys():
-        stored_execs[note["executor_index"]] = False
+    if DEBUG_MODE:
+        print("Checking exec states...")
 
-    dot2_ws.poll_exec_state() #triggers handle playbacks
+    while executor_states_thread.is_alive():
+        time.sleep(EXEC_STATE_CHECK_INTERVAL)
+        last_exec_state = executor_states
+        current_exec_state = dot2_ws.poll_exec_state() #triggers handle playbacks
 
+        print("last execs", last_exec_state)
+        print("current execs", current_exec_state)
 
+        '''execs_on = list(last_exec_state.keys() - current_exec_state.keys()) # Contains a list of executors that have been turned on since the last check
+        execs_off = list(current_exec_state.keys() - last_exec_state.keys()) # idem with execs turned off
 
+        if execs_on != []:
+            for exec in execs_on:
+                update_button_color(
+                    executor_to_note(exec),
+                    blink=True
+                )
 
+        if execs_off != []:
+            for exec in execs_on:
+                update_button_color(
+                    executor_to_note(exec),
+                    blink=False
+                )
 
+        executor_states = current_exec_state # Save the new executors states'''
 
-    def handle_pybacks(data):
-        item_groups = data.get("itemGroups")  # note: "itemGroups" not "itemsGroups"
-        if not item_groups:
-            return
+def start_check_exec_state_loop():
+    """Starts a thread that checks the state of execs in the background"""
 
-        new_states = {}
-        blinking_buttons = set()
+    global executor_states_thread
 
-        for group in item_groups:
-            items = group.get("items", [])
-            for item_list in items:
-                if not item_list:
-                    continue
-                item = item_list[0]
-                exec_id = item.get("iExec")
-                is_run = item.get("isRun", 0)
-                if exec_id is not None:
-                    new_states[exec_id] = bool(is_run)
-
-        with _executor_states_lock:
-            executor_states.clear()
-            executor_states.update(new_states)
-
-        # Check all stored buttons and update blinking state
-        for note_str, button_data in note_executor_dictionnary.items():
-            exec_index = button_data["executor_index"]
-            button_type = button_data.get("type", "normal")
-
-            if exec_index in new_states:
-                is_on = new_states[exec_index]
-                note_num = int(note_str)
-
-                # Handle normal buttons
-                if button_type == "normal":
-                    colors = button_data["colors"]
-                    if len(colors) > 1 and is_on:
-                        _start_color_cycle(note_str)
-                    elif not is_on:
-                        _stop_color_cycle[note_str] = True
-                        if colors:
-                            msg = mido.Message('note_on', channel=DEFAULT_BRIGHTNESS_LEVEL,
-                                               note=note_num, velocity=colors[0])
-                            MIDI_OUTPORT.send(msg)
-                    # else: is_on=True but single color → do nothing, keep current state
-
-
-                # Handle special buttons
-                elif button_type == "special":
-                    if is_on:
-                        # Blinking state for special buttons (channel 1, velocity 2)
-                        msg = mido.Message('note_on', channel=1, note=note_num, velocity=2)
-                        MIDI_OUTPORT.send(msg)
-                    else:
-                        # Turn off blinking
-                        msg = mido.Message('note_on', channel=6, note=note_num, velocity=0)
-                        MIDI_OUTPORT.send(msg)
-
+    if DEBUG_MODE:
+        print("Starting persistent check exec state callback...")
     # Register persistent callback
-    dot2_ws.on("itemsGroups", handle_playbacks)
+    dot2_ws.on("playbacks", handle_playbacks)
 
-    def poll_loop():
-        REQUEST = {
-            "requestType": "playbacks",
-            "startIndex": [0, 100, 200, 300, 400, 500, 600, 700, 800],
-            "itemsCount": [22, 22, 22, 16, 16, 16, 16, 16, 16],
-            "pageIndex": 0,
-            "itemsType": [3, 3, 3, 3, 3, 3, 3, 3, 3],
-            "view": 3,
-            "execButtonViewMode": 2,
-            "buttonsViewMode": 0,
-            "maxRequests": 1
-        }
-        while True:
-            if dot2_ws.logged_in and dot2_ws.session_id is not None:
-                REQUEST["session"] = dot2_ws.session_id
-                dot2_ws._send(REQUEST)
-            time.sleep(interval)
+    executor_states_thread = threading.Thread(target=check_exec_state, daemon=True)
+    executor_states_thread.start()
 
-    thread = threading.Thread(target=poll_loop, daemon=True)
-    thread.start()
+def executor_to_note(executor):
+    """gives the note that's connected to the given executor"""
+    # create a temporary dictionary with inverted executor index and note
+    temp_dict = {
+        value["executor_index"]: key
+        for key, value in note_executor_dictionary.items()
+    }
 
-    return executor_states
+    return temp_dict[executor]
 
 ###################################################
 #                       Midi                      #
@@ -220,8 +206,6 @@ def select_midi_ports():
 
     available_inputs = mido.get_input_names()
     available_outputs = mido.get_output_names()
-    temporary_input = ''
-    temporary_output = ''
 
     if DEBUG_MODE:
         print('================= Input/Output Selection =================')
@@ -261,16 +245,20 @@ def link_executor_note(note):
     :param note -> the MIDI note number to link
     """
 
-    executor_index = int(input("Please input the id of the executor")) - 1
+    temp = input("Please input the id of the executor")
+    if temp is None:
+        return
+    executor_index = int(temp) - 1
+
     if note in NORMAL_BUTTON_NOTES:
         num_colors = int(input("How many colors for this button?"))
         colors = choose_color(color_number=num_colors)
         pulse_channel = 10
-        append_note_to_json(note, colors, executor_index, pulse_channel=pulse_channel, type="normal")
+        append_note_to_json(note, colors, executor_index, pulse_channel=pulse_channel, pad_type="normal")
 
     elif note in SPECIAL_BUTTON_NOTES:
         colors = [1]
-        append_note_to_json(note, colors, executor_index, pulse_channel=1, type="special")
+        append_note_to_json(note, colors, executor_index, pulse_channel=1, pad_type="special")
     load_json()
     update_colors()
 
@@ -288,24 +276,29 @@ def note_loop():
     if int(note) in FADER_CC:
         return
     elif note_is_stored:
-        executor_index = note_executor_dictionnary[str(note)]["executor_index"]
+        executor_index = note_executor_dictionary[str(note)]["executor_index"]
         dot2_ws.send_playback_click(executor_index, pressed=velocity == 127)
     elif not note_is_stored and message.type == 'note_on':
         link_executor_note(note)
 
-def note_in_json(note):
-    return str(note) in note_executor_dictionnary
+def send_midi_message(midi_message_type, channel, note, velocity):
+    msg = mido.Message(type=str(midi_message_type), channel=int(channel), note=int(note), velocity=int(velocity))
+    MIDI_OUTPORT.send(msg)
 
-def update_button_color(note):
+###################################################
+#                      Colors                     #
+###################################################
+
+def update_button_color(note, blink = False):
     """Background thread that cycles through multiple colors for a button."""
     note_str = str(note)
     _stop_color_cycle[note_str] = False
 
     while not _stop_color_cycle.get(note_str, True):
-        if note_str not in note_executor_dictionnary:
+        if note_str not in note_executor_dictionary:
             break
 
-        colors = note_executor_dictionnary[note_str]["colors"]
+        colors = note_executor_dictionary[note_str]["colors"]
         if len(colors) <= 1:
             break
 
@@ -314,9 +307,12 @@ def update_button_color(note):
                 break
 
             velocity = color_v
-            intensity = DEFAULT_BRIGHTNESS_LEVEL
-            msg = mido.Message('note_on', channel=int(intensity), note=int(note_str), velocity=int(velocity))
-            MIDI_OUTPORT.send(msg)
+            if not blink:
+                intensity = DEFAULT_BRIGHTNESS_LEVEL
+                send_midi_message(midi_message_type='note_on', channel=intensity, note=note_str, velocity=velocity)
+            elif blink:
+                intensity = note_executor_dictionary[note_str]["pulse_channel"]
+                send_midi_message(midi_message_type='note_on', channel=intensity, note=note_str, velocity=velocity)
             time.sleep(COLOR_CYCLE_INTERVAL)
 
     _color_cycle_threads.pop(note_str, None)
@@ -327,8 +323,7 @@ def choose_color(color_number):
     color_tuple = []
     for i in range(color_number):
         for pad in range(len(BUTTON_COLORS)):
-            msg = mido.Message('note_on', channel=6, note=pad, velocity=BUTTON_COLORS[pad])
-            MIDI_OUTPORT.send(msg)
+            send_midi_message(midi_message_type='note_on', channel=6, note=pad, velocity=BUTTON_COLORS[pad])
 
         message = listen_to_note_on()
         color_tuple.append(BUTTON_COLORS[message.note])
@@ -341,18 +336,15 @@ def turn_off_pad(pad_list="All"):
 
         # turn normal pads
         for pad in NORMAL_BUTTON_NOTES:
-            msg = mido.Message('note_on', channel=6, note=pad, velocity=0)
-            MIDI_OUTPORT.send(msg)
+            send_midi_message(midi_message_type='note_on', channel=6, note=pad, velocity=0)
 
         # turn special pads
         for pad in SPECIAL_BUTTON_NOTES:
-            msg = mido.Message('note_on', channel=1, note=pad, velocity=0)
-            MIDI_OUTPORT.send(msg)
+            send_midi_message(midi_message_type='note_on', channel=1, note=pad, velocity=0)
     else:
         # turn off given pads
         for pad in pad_list:
-            msg = mido.Message('note_on', channel=6, note=pad, velocity=0)
-            MIDI_OUTPORT.send(msg)
+            send_midi_message(midi_message_type='note_on', channel=6, note=pad, velocity=0)
 
 def update_colors():
     """Updates all colors of the pad including special buttons."""
@@ -365,11 +357,11 @@ def update_colors():
     turn_off_pad("All")
     print(print("Pads turned off.\n"))
 
-    for button in note_executor_dictionnary:
+    for button in note_executor_dictionary:
 
         note_str = str(button)
-        colors = note_executor_dictionnary[note_str]["colors"]
-        button_type = note_executor_dictionnary[note_str]["type"]
+        colors = note_executor_dictionary[note_str]["colors"]
+        button_type = note_executor_dictionary[note_str]["type"]
         if DEBUG_MODE:
             print(f"\n================= Button [{button}] =================")
             print(f"Updating colors for button [{button}]...")
@@ -387,8 +379,7 @@ def update_colors():
             # Send Midi Message(Update First Color)
             if DEBUG_MODE:
                 print(f"Sending message to button, color updating...")
-            msg = mido.Message('note_on', channel=int(intensity), note=int(note_str), velocity=int(first_velocity))
-            MIDI_OUTPORT.send(msg)
+            send_midi_message(midi_message_type='note_on', channel=intensity, note=note_str, velocity=first_velocity)
             if DEBUG_MODE:
                 print(f"Message sent to the button, color updated.")
 
@@ -403,12 +394,10 @@ def update_colors():
 
 
         elif button_type == "special":
-            intensity = 1
-
             if DEBUG_MODE:
                 print(f"Sending message to button, color updating...")
-            msg = mido.Message('note_on', channel=0, note=int(note_str), velocity=1) # Channel 0 is the only channel that should be used with special buttons
-            MIDI_OUTPORT.send(msg)
+            send_midi_message(midi_message_type='note_on', channel=0, note=note_str, velocity=1) # Channel 0 is the only channel that should be used with special buttons
+
             if DEBUG_MODE:
                 print(f"Message sent to the button, color updated.")
 
@@ -449,6 +438,24 @@ def _start_color_cycle(note_str):
     _color_cycle_threads[note_str] = thread
     thread.start()
 
+def toggle_blink(note, blink):
+    """Toggle blinking on or off.
+    Args:
+        blink: Boolean, True if it should start blinking
+        note: Integer, note to start/stop blinking
+    """
+    if note in NORMAL_BUTTON_NOTES:
+        if blink:
+            send_midi_message(
+                midi_message_type='note_on',
+                channel=note_executor_dictionary[note]["channel"],
+                note=note,
+                velocity=note_executor_dictionary[note]["velocity"],
+            )
+
+
+
+
 ###################################################
 #                       Main                      #
 ###################################################
@@ -460,6 +467,7 @@ load_json()
 select_midi_ports()
 dot2_ws.connect()
 update_colors()
+# start_check_exec_state_loop()
 
 while not dot2_ws.logged_in:
     time.sleep(0.1)
