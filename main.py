@@ -16,7 +16,7 @@ DEFAULT_MIDI_OUTPORT_DEVICE1 = ""
 DEFAULT_MIDI_INPORT_DEVICE2= ""
 DEFAULT_MIDI_OUTPORT_DEVICE2 = ""
 
-FADER_NOTES = (71, 72, 73, 74, 75, 76, 77, 78, 79)
+FADER_NOTES = (81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98)
 NORMAL_BUTTON_NOTES = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63)
 SPECIAL_BUTTON_NOTES = (100, 101, 102, 103, 104, 105, 106, 107, 112, 113, 114, 115, 116, 117, 118, 119)
 SHIFT_KEY = 122
@@ -24,7 +24,7 @@ SHIFT_KEY = 122
 note_executor_dictionary_device1 = {}
 note_executor_dictionary_device2 = {}
 BUTTON_COLORS_DEVICE1 = [107, 108, 96, 84, 60, 106, 120, 5, 89, 28, 29, 90, 77, 94, 57, 56, 105, 63, 111, 110, 73, 16, 20, 24, 97, 62, 100, 99, 109, 12, 113, 8, 64, 76, 21, 25, 75, 98, 74, 13, 104, 69, 41, 66, 68, 65, 102, 101, 93, 115, 70, 3, 117, 71, 112, 103, 114, 32, 36, 40, 91, 92, 44, 48]
-BUTTON_COLORS_DEVICE2 = []
+BUTTON_COLORS_DEVICE2 = BUTTON_COLORS_DEVICE1
 DEFAULT_BRIGHTNESS_LEVEL = 6
 DEFAULT_BLINK_CHANNEL = 10
 
@@ -108,9 +108,6 @@ def append_note_to_json(note, executor_index, device_id, color=None, filepath="d
 
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
-
-def note_in_json(note):
-    return str(note) in note_executor_dictionary_device1 or str(note) in note_executor_dictionary_device2
 
 def set_default_devices(device1_input="", device1_output="", device2_input="", device2_output="", filepath="data.json"):
     """
@@ -248,21 +245,18 @@ def link_executor_note(note, device_id):
 
 def note_loop(message, device_id):
     note = message.note
-    print("here")
     if int(note) in FADER_NOTES:
         return
 
-    note_is_stored = note_in_json(note)
-
-    if note_is_stored:
-        if device_id == 1:
-            executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
-        elif device_id == 2:
-            executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
-        print("we got there")
+    if device_id == 1 and str(note) in note_executor_dictionary_device1:
+        executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
         dot2_ws.send_playback_click(executor_index, pressed=message.velocity == 127)
-        print("and here")
-    elif not note_is_stored and message.type == 'note_on':
+
+    elif device_id == 2 and str(note) in note_executor_dictionary_device2:
+        executor_index = note_executor_dictionary_device2[str(note)]["executor_index"]
+        dot2_ws.send_playback_click(executor_index, pressed=message.velocity == 127)
+
+    elif message.type == 'note_on':
         link_executor_note(note, device_id)
 
 def send_midi_message(midi_message_type, channel, note, velocity, device_id=3):
@@ -285,15 +279,17 @@ def listen_to_note():
 
 def choose_color():
     color_velocity = 0
+    print("OOOOO")
     for pad in range(len(BUTTON_COLORS_DEVICE1)):
         send_midi_message(midi_message_type='note_on', channel=6, note=pad, velocity=BUTTON_COLORS_DEVICE1[pad],device_id=1)
 
     for pad in range(len(BUTTON_COLORS_DEVICE2)):
-        send_midi_message(midi_message_type='note_on', channel=6, note=pad, velocity=BUTTON_COLORS_DEVICE1[pad],device_id=2)
+        send_midi_message(midi_message_type='note_on', channel=6, note=pad, velocity=BUTTON_COLORS_DEVICE2[pad],device_id=2)
 
     message, device_id = listen_to_note()
     while message.type != 'note_on':
         message,device_id = listen_to_note()
+        print(device_id)
     if device_id == 1:
         color_velocity = BUTTON_COLORS_DEVICE1[message.note]
     elif device_id == 2:
@@ -317,10 +313,10 @@ def update_colors():
         #Handles different button types
         if int(button_note) in NORMAL_BUTTON_NOTES:
             intensity = DEFAULT_BRIGHTNESS_LEVEL
-            send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color)
+            send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color, device_id=1)
 
         elif int(button_note) in SPECIAL_BUTTON_NOTES:
-            send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1) # Channel 0 is the only channel that should be used with special buttons
+            send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=1) # Channel 0 is the only channel that should be used with special buttons
 
 
     for button_note in note_executor_dictionary_device2:
@@ -329,10 +325,10 @@ def update_colors():
         #Handles different button types
         if int(button_note) in NORMAL_BUTTON_NOTES:
             intensity = DEFAULT_BRIGHTNESS_LEVEL
-            send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color)
+            send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color, device_id=2)
 
         elif int(button_note) in SPECIAL_BUTTON_NOTES:
-            send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1) # Channel 0 is the only channel that should be used with special buttons
+            send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=2) # Channel 0 is the only channel that should be used with special buttons
 
 load_json()
 

@@ -9,5 +9,6 @@
   "DEFAULT_MIDI_OUTPORT_DEVICE2": "Bome MIDI Translator 2 5",
   "note_executor_dictionary_device1": {
   },
-  "note_executor_dictionary_device2": {}
+  "note_executor_dictionary_device2": {
+  }
 }
