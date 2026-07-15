@@ -5,7 +5,7 @@ import threading
 import websocket
 
 class Dot2WebSocketHandler:
-    def __init__(self, host="10.0.0.50", username="remote", password="1", heartbeat_step=10, debug=False, start_index=[0, 100, 200, 300, 400, 500, 600, 700, 800], items_count=[22, 22, 22, 16, 16, 16, 16, 16, 16]):
+    def __init__(self, host="10.0.0.50", username="remote", password="1", heartbeat_step=10, debug=True, start_index=[0, 100, 200, 300, 400, 500, 600, 700, 800], items_count=[22, 22, 22, 16, 16, 16, 16, 16, 16]):
         self.HOST = host
         self.URL = f"ws://{self.HOST}/?ma=1"
         self.ORIGIN = f"http://{self.HOST}"
