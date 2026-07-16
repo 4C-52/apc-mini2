@@ -230,9 +230,9 @@ def link_executor_note(note, device_id):
     :param note -> the MIDI note number to link
     :param device_id -> the device ID to link the executor to, check GitHub to know device IDs
     """
-    if str(note) in note_executor_dictionary_device1.keys():
+    if device_id == 1 and str(note) in note_executor_dictionary_device1.keys():
         executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
-    elif str(note) in note_executor_dictionary_device2.keys():
+    elif device_id == 2 and str(note) in note_executor_dictionary_device2.keys():
         executor_index = note_executor_dictionary_device2[str(note)]["executor_index"]
     else:
         temp = input("Please input the id of the executor")
@@ -244,7 +244,7 @@ def link_executor_note(note, device_id):
         color = choose_color()
         append_note_to_json(note, executor_index, device_id=device_id, color=color)
 
-    elif note in SPECIAL_BUTTON_NOTES:
+    elif note in SPECIAL_BUTTON_NOTES or note == SHIFT_KEY:
         append_note_to_json(note, executor_index, device_id=device_id, color=1)
 
     load_json()
@@ -324,10 +324,10 @@ def update_colors():
             #Handles different button types
             if int(button_note) in NORMAL_BUTTON_NOTES:
                 intensity = DEFAULT_BRIGHTNESS_LEVEL
-                send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color, device_id=1)
+                send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color, device_id=device+1)
 
             elif int(button_note) in SPECIAL_BUTTON_NOTES:
-                send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=1) # Channel 0 is the only channel that should be used with special buttons
+                send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=device+1) # Channel 0 is the only channel that should be used with special buttons
 
 load_json()
 
