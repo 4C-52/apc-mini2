@@ -1,10 +1,15 @@
-import tkinter as tk
+from web_socket_handler import Dot2WebSocketHandler
 from tkinter import simpledialog
+from datetime import datetime
 
+import tkinter as tk
 import mido
+import os
+import glob
 import json
 import time
-from web_socket_handler import Dot2WebSocketHandler
+import shutil
+import keyboard
 
 MIDI_INPORT_DEVICE1 = ""
 MIDI_OUTPORT_DEVICE1 = ""
@@ -38,6 +43,7 @@ START_INDEX = [0, 100, 200, 300, 400, 500, 600, 700, 800]
 ITEMS_COUNT = [22, 22, 22, 16, 16, 16, 16, 16, 16]
 
 CONFIG_MODE = 1
+DATA_FILEPATH = "data.json"
 
 def input(prompt=""):
     root = tk.Tk()
@@ -50,7 +56,7 @@ def input(prompt=""):
 def load_json():
     global CONFIG_MODE, note_executor_dictionary_device1, note_executor_dictionary_device2, DEFAULT_BRIGHTNESS_LEVEL, PLAINTEXT_PASSWORD, HOST, DEFAULT_BLINK_CHANNEL, DEFAULT_MIDI_INPORT_DEVICE1, DEFAULT_MIDI_INPORT_DEVICE2, DEFAULT_MIDI_OUTPORT_DEVICE1, DEFAULT_MIDI_OUTPORT_DEVICE2
 
-    with open("data.json", "r") as data:
+    with open(DATA_FILEPATH, "r") as data:
         data = json.load(data)
 
     note_executor_dictionary_device1    =   data["note_executor_dictionary_device1"]
@@ -77,7 +83,7 @@ def load_json():
     if temp != "":
         DEFAULT_MIDI_OUTPORT_DEVICE2    =   data["DEFAULT_MIDI_OUTPORT_DEVICE2"]
 
-def append_note_to_json(note, executor_index, device_id, color=None, filepath="data.json"):
+def append_note_to_json(note, executor_index, device_id, color=None, filepath=DATA_FILEPATH):
     with open(filepath, "r") as f:
         data = json.load(f)
 
@@ -112,7 +118,7 @@ def append_note_to_json(note, executor_index, device_id, color=None, filepath="d
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
-def set_default_devices(device1_input="", device1_output="", device2_input="", device2_output="", filepath="data.json"):
+def set_default_devices(device1_input="", device1_output="", device2_input="", device2_output="", filepath=DATA_FILEPATH):
     """
 
     :param device1_input: # default = "" because if it was None it'd cause problems
@@ -136,6 +142,37 @@ def set_default_devices(device1_input="", device1_output="", device2_input="", d
 
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
+
+def invert_devices():
+    global MIDI_INPORT_DEVICE1, MIDI_INPORT_DEVICE2, MIDI_OUTPORT_DEVICE1, MIDI_OUTPORT_DEVICE2
+
+    MIDI_INPORT_DEVICE1, MIDI_INPORT_DEVICE2 = MIDI_INPORT_DEVICE2, MIDI_INPORT_DEVICE1
+    MIDI_OUTPORT_DEVICE1, MIDI_OUTPORT_DEVICE2 = MIDI_OUTPORT_DEVICE2, MIDI_OUTPORT_DEVICE1
+
+    update_colors()
+
+def toggle_config_mode(filepath=DATA_FILEPATH):
+    global CONFIG_MODE
+
+    CONFIG_MODE = not CONFIG_MODE
+
+    with open(filepath, "r") as f:
+        data = json.load(f)
+
+    if CONFIG_MODE:
+        flash_color(2, 5)
+        data["config_mode"] = 1
+    elif not CONFIG_MODE:
+        flash_color(2, 21)
+        data["config_mode"] = 0
+
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
+
+def flash_color(duration, color):
+    set_all_pads(velocity=color, channel=11)
+    time.sleep(duration)
+    update_colors()
 
 #WIP
 def handle_playbacks(data):
@@ -224,6 +261,67 @@ def select_midi_ports():
     set_default_devices(device1_input=DEFAULT_MIDI_INPORT_DEVICE1,device2_input=DEFAULT_MIDI_INPORT_DEVICE2,device1_output=DEFAULT_MIDI_OUTPORT_DEVICE1,device2_output=DEFAULT_MIDI_OUTPORT_DEVICE2)
     print(f"Midi Device IN 1: {MIDI_INPORT_DEVICE1}\nMidi Device IN 2: {MIDI_INPORT_DEVICE2}\nMIDI Device OUT 1: {MIDI_OUTPORT_DEVICE1}\nMIDI Device OUT 2: {MIDI_OUTPORT_DEVICE2}\n")
 
+def set_all_pads(velocity=0, channel=DEFAULT_BRIGHTNESS_LEVEL):
+    for pad in NORMAL_BUTTON_NOTES:
+        send_midi_message(midi_message_type="note_on", channel=channel, note=pad, velocity=velocity)
+
+def remove_color_from_data(filepath=DATA_FILEPATH):
+    if input(f"Are you sure you want to remove all colors?(Y/N) \nA backup will be created.").lower() == "y":
+        if input(f"Type \"CONFIRM\" to remove all colors from the stored data.") != "CONFIRM":
+            return
+    else:
+        return
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%Hh%M")  # no colons!
+
+    base_dir = os.path.dirname(os.path.abspath(filepath))
+    backup_directory_path = os.path.join(base_dir, "backups")
+    backup_filepath = os.path.join(backup_directory_path, f"data_backup_{timestamp}.json")
+
+    os.makedirs(backup_directory_path, exist_ok=True)
+    shutil.copy2(filepath, backup_filepath)
+
+    with open(filepath, "r") as f:
+        data = json.load(f)
+
+    for note in data["note_executor_dictionary_device1"].keys():
+        data["note_executor_dictionary_device1"][str(note)]["color"] = -1
+    for note in data["note_executor_dictionary_device2"].keys():
+        data["note_executor_dictionary_device2"][str(note)]["color"] = -1
+
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
+
+    load_json()
+    update_colors()
+
+def get_last_backup(backup_directory_path):
+    backups = glob.glob(os.path.join(backup_directory_path, "data_backup_*.json"))
+    if not backups:
+        return None
+    backups.sort()  # timestamp format YYYY-MM-DD_HH-MM sorts correctly as strings
+    return backups[-1]
+
+def restore_last_backup(filepath=DATA_FILEPATH):
+
+    backup_directory_path = os.path.join(os.path.dirname(os.path.abspath(filepath)), "backups")
+    last_backup = get_last_backup(backup_directory_path)
+
+    if not last_backup:
+        print("No backup found to restore.")
+        return
+
+    if input(f"Are you sure you want to load the last backup?(Y/N) \nYOUR CURRENT COLORS WILL BE OVERWRITTEN.").lower() == "y":
+        if input(f"Type \"CONFIRM\" to load the last backup. Your current file will be LOST.") != "CONFIRM":
+            return
+    else:
+        return
+
+    shutil.copy2(last_backup, filepath)
+
+    load_json()
+    update_colors()
+
 def link_executor_note(note, device_id):
     """
     Updates the data.json file
@@ -304,8 +402,7 @@ def choose_color():
     return color_velocity
 
 def turn_off_pad():
-    for pad in NORMAL_BUTTON_NOTES:
-        send_midi_message(midi_message_type='note_on', channel=6, note=pad, velocity=0)
+    set_all_pads(0, 6)
 
     for pad in SPECIAL_BUTTON_NOTES:
         send_midi_message(midi_message_type='note_on', channel=0, note=pad, velocity=0)
@@ -346,6 +443,11 @@ update_colors()
 
 while not dot2_ws.logged_in:
     time.sleep(0.1)
+
+keyboard.add_hotkey("F1", invert_devices)
+keyboard.add_hotkey("F2", toggle_config_mode)
+keyboard.add_hotkey("F11", restore_last_backup)
+keyboard.add_hotkey("F12", remove_color_from_data)
 
 while True:
     for msg in MIDI_INPORT_DEVICE1.iter_pending():

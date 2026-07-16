@@ -75,35 +75,35 @@
     },
     "16": {
       "executor_index": 807,
-      "color": -1
+      "color": 94
     },
     "17": {
       "executor_index": 806,
-      "color": -1
+      "color": 36
     },
     "18": {
       "executor_index": 805,
-      "color": -1
+      "color": 13
     },
     "19": {
       "executor_index": 804,
-      "color": -1
+      "color": 41
     },
     "20": {
       "executor_index": 803,
-      "color": -1
+      "color": 21
     },
     "21": {
       "executor_index": 802,
-      "color": -1
+      "color": 84
     },
     "22": {
       "executor_index": 801,
-      "color": -1
+      "color": 5
     },
     "23": {
       "executor_index": 800,
-      "color": -1
+      "color": 3
     },
     "24": {
       "executor_index": 707,
@@ -175,31 +175,31 @@
     },
     "41": {
       "executor_index": 506,
-      "color": -1
+      "color": 48
     },
     "42": {
       "executor_index": 505,
-      "color": -1
+      "color": 91
     },
     "43": {
       "executor_index": 504,
-      "color": -1
+      "color": 74
     },
     "44": {
       "executor_index": 503,
-      "color": -1
+      "color": 92
     },
     "45": {
       "executor_index": 502,
-      "color": -1
+      "color": 75
     },
     "46": {
       "executor_index": 501,
-      "color": -1
+      "color": 96
     },
     "47": {
       "executor_index": 500,
-      "color": -1
+      "color": 106
     },
     "48": {
       "executor_index": 407,
@@ -298,27 +298,27 @@
       "color": 1
     },
     "112": {
-      "executor_index": 107,
+      "executor_index": 102,
       "color": 1
     },
     "113": {
-      "executor_index": 106,
+      "executor_index": 202,
       "color": 1
     },
     "114": {
-      "executor_index": 105,
+      "executor_index": 2,
       "color": 1
     },
     "115": {
-      "executor_index": 104,
+      "executor_index": 101,
       "color": 1
     },
     "116": {
-      "executor_index": 103,
+      "executor_index": 201,
       "color": 1
     },
     "117": {
-      "executor_index": 102,
+      "executor_index": 1,
       "color": 1
     },
     "118": {
@@ -337,23 +337,23 @@
   "note_executor_dictionary_device2": {
     "0": {
       "executor_index": 221,
-      "color": -1
+      "color": 3
     },
     "1": {
       "executor_index": 220,
-      "color": -1
+      "color": 3
     },
     "2": {
       "executor_index": 219,
-      "color": -1
+      "color": 56
     },
     "3": {
       "executor_index": 218,
-      "color": -1
+      "color": 56
     },
     "4": {
       "executor_index": 217,
-      "color": -1
+      "color": 56
     },
     "5": {
       "executor_index": 216,
@@ -369,23 +369,23 @@
     },
     "8": {
       "executor_index": 121,
-      "color": -1
+      "color": 117
     },
     "9": {
       "executor_index": 120,
-      "color": -1
+      "color": 117
     },
     "10": {
       "executor_index": 119,
-      "color": -1
+      "color": 57
     },
     "11": {
       "executor_index": 118,
-      "color": 77
+      "color": 57
     },
     "12": {
       "executor_index": 117,
-      "color": -1
+      "color": 57
     },
     "13": {
       "executor_index": 116,
@@ -624,40 +624,41 @@
       "color": 1
     },
     "112": {
-      "executor_index": 207,
+      "executor_index": 105,
       "color": 1
     },
     "113": {
-      "executor_index": 206,
-      "color": 1
-    },
-    "114": {
       "executor_index": 205,
       "color": 1
     },
+    "114": {
+      "executor_index": 5,
+      "color": 1
+    },
     "115": {
-      "executor_index": 204,
+      "executor_index": 104,
       "color": 1
     },
     "116": {
-      "executor_index": 203,
+      "executor_index": 204,
       "color": 1
     },
     "117": {
-      "executor_index": 202,
+      "executor_index": 4,
       "color": 1
     },
     "118": {
-      "executor_index": 101,
+      "executor_index": 103,
       "color": 1
     },
     "119": {
-      "executor_index": 201,
+      "executor_index": 203,
       "color": 1
     },
     "122": {
-      "executor_index": 1,
+      "executor_index": 3,
       "color": 1
     }
-  }
+  },
+  "CONFIG_MODE": true
 }
