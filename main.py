@@ -37,6 +37,8 @@ HEARTBEAT_STEP = 10
 START_INDEX = [0, 100, 200, 300, 400, 500, 600, 700, 800]
 ITEMS_COUNT = [22, 22, 22, 16, 16, 16, 16, 16, 16]
 
+CONFIG_MODE = 1
+
 def input(prompt=""):
     root = tk.Tk()
     root.withdraw()
@@ -46,7 +48,7 @@ def input(prompt=""):
     return result
 
 def load_json():
-    global note_executor_dictionary_device1, note_executor_dictionary_device2, DEFAULT_BRIGHTNESS_LEVEL, PLAINTEXT_PASSWORD, HOST, DEFAULT_BLINK_CHANNEL, DEFAULT_MIDI_INPORT_DEVICE1, DEFAULT_MIDI_INPORT_DEVICE2, DEFAULT_MIDI_OUTPORT_DEVICE1, DEFAULT_MIDI_OUTPORT_DEVICE2
+    global CONFIG_MODE, note_executor_dictionary_device1, note_executor_dictionary_device2, DEFAULT_BRIGHTNESS_LEVEL, PLAINTEXT_PASSWORD, HOST, DEFAULT_BLINK_CHANNEL, DEFAULT_MIDI_INPORT_DEVICE1, DEFAULT_MIDI_INPORT_DEVICE2, DEFAULT_MIDI_OUTPORT_DEVICE1, DEFAULT_MIDI_OUTPORT_DEVICE2
 
     with open("data.json", "r") as data:
         data = json.load(data)
@@ -57,6 +59,7 @@ def load_json():
     DEFAULT_BLINK_CHANNEL               =   data["default_blink_channel"]
     HOST                                =   data["default_ip_address"]
     PLAINTEXT_PASSWORD                  =   data["dot2_password"]
+    CONFIG_MODE                         =   data["config_mode"]
 
     temp = data["DEFAULT_MIDI_INPORT_DEVICE1"]
     if temp != "":
@@ -112,7 +115,7 @@ def append_note_to_json(note, executor_index, device_id, color=None, filepath="d
 def set_default_devices(device1_input="", device1_output="", device2_input="", device2_output="", filepath="data.json"):
     """
 
-    :param device1_input: # default = "" because if it was None it'd cqause problems
+    :param device1_input: # default = "" because if it was None it'd cause problems
     :param device1_output:
     :param device2_input:
     :param device2_output:
@@ -227,11 +230,15 @@ def link_executor_note(note, device_id):
     :param note -> the MIDI note number to link
     :param device_id -> the device ID to link the executor to, check GitHub to know device IDs
     """
-
-    temp = input("Please input the id of the executor")
-    if temp is None:
-        return
-    executor_index = int(temp) - 1
+    if str(note) in note_executor_dictionary_device1.keys():
+        executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
+    elif str(note) in note_executor_dictionary_device2.keys():
+        executor_index = note_executor_dictionary_device2[str(note)]["executor_index"]
+    else:
+        temp = input("Please input the id of the executor")
+        if temp is None:
+            return
+        executor_index = int(temp) - 1
 
     if note in NORMAL_BUTTON_NOTES:
         color = choose_color()
@@ -248,16 +255,16 @@ def note_loop(message, device_id):
     if int(note) in FADER_NOTES:
         return
 
-    if device_id == 1 and str(note) in note_executor_dictionary_device1:
+    if message.type == 'note_on' and CONFIG_MODE:
+        link_executor_note(note, device_id)
+
+    elif device_id == 1 and str(note) in note_executor_dictionary_device1:
         executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
         dot2_ws.send_playback_click(executor_index, pressed=message.velocity == 127)
 
     elif device_id == 2 and str(note) in note_executor_dictionary_device2:
         executor_index = note_executor_dictionary_device2[str(note)]["executor_index"]
         dot2_ws.send_playback_click(executor_index, pressed=message.velocity == 127)
-
-    elif message.type == 'note_on':
-        link_executor_note(note, device_id)
 
 def send_midi_message(midi_message_type, channel, note, velocity, device_id=3):
     midi_message = mido.Message(type=str(midi_message_type), channel=int(channel), note=int(note), velocity=int(velocity))
@@ -279,7 +286,6 @@ def listen_to_note():
 
 def choose_color():
     color_velocity = 0
-    print("OOOOO")
     for pad in range(len(BUTTON_COLORS_DEVICE1)):
         send_midi_message(midi_message_type='note_on', channel=6, note=pad, velocity=BUTTON_COLORS_DEVICE1[pad],device_id=1)
 
@@ -289,7 +295,8 @@ def choose_color():
     message, device_id = listen_to_note()
     while message.type != 'note_on':
         message,device_id = listen_to_note()
-        print(device_id)
+        if message.note not in NORMAL_BUTTON_NOTES:
+            return -1
     if device_id == 1:
         color_velocity = BUTTON_COLORS_DEVICE1[message.note]
     elif device_id == 2:
@@ -306,29 +313,21 @@ def turn_off_pad():
 def update_colors():
     """Updates all colors of the pad including special buttons."""
     turn_off_pad()
+    note_executor_dictionaries = [note_executor_dictionary_device1, note_executor_dictionary_device2]
 
-    for button_note in note_executor_dictionary_device1:
-        color = note_executor_dictionary_device1[button_note]["color"]
+    for device in range(2):
+        for button_note in note_executor_dictionaries[device]:
+            color = note_executor_dictionaries[device][button_note]["color"]
+            if color < 0:
+                continue
 
-        #Handles different button types
-        if int(button_note) in NORMAL_BUTTON_NOTES:
-            intensity = DEFAULT_BRIGHTNESS_LEVEL
-            send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color, device_id=1)
+            #Handles different button types
+            if int(button_note) in NORMAL_BUTTON_NOTES:
+                intensity = DEFAULT_BRIGHTNESS_LEVEL
+                send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color, device_id=1)
 
-        elif int(button_note) in SPECIAL_BUTTON_NOTES:
-            send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=1) # Channel 0 is the only channel that should be used with special buttons
-
-
-    for button_note in note_executor_dictionary_device2:
-        color = note_executor_dictionary_device2[button_note]["color"]
-
-        #Handles different button types
-        if int(button_note) in NORMAL_BUTTON_NOTES:
-            intensity = DEFAULT_BRIGHTNESS_LEVEL
-            send_midi_message(midi_message_type='note_on', channel=intensity, note=button_note, velocity=color, device_id=2)
-
-        elif int(button_note) in SPECIAL_BUTTON_NOTES:
-            send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=2) # Channel 0 is the only channel that should be used with special buttons
+            elif int(button_note) in SPECIAL_BUTTON_NOTES:
+                send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=1) # Channel 0 is the only channel that should be used with special buttons
 
 load_json()
 
