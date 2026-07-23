@@ -435,7 +435,7 @@ def update_colors():
 
             elif int(button_note) in SPECIAL_BUTTON_NOTES:
                 send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=device+1) # Channel 0 is the only channel that should be used with special buttons
-    dot2_ws.poll_exec_state()
+    update_all_blinking()
 
 def set_colors(note_list, color, device_id):
     for note in note_list:
@@ -463,6 +463,12 @@ def toggle_blink_note(note, device_id, toggle_on):
             send_midi_message("note_on", DEFAULT_BLINK_CHANNEL, note, velocity=color, device_id=device_id)
         elif not toggle_on:
             send_midi_message("note_on", DEFAULT_BRIGHTNESS_LEVEL, note, velocity=color, device_id=device_id)
+
+def update_all_blinking():
+    global executor_states, temporary_exec_states
+    executor_states = set()
+    temporary_exec_states = set()
+    dot2_ws.poll_exec_state()
 
 def dot2_logo():
     set_all_pads(109, 6)
@@ -596,11 +602,12 @@ keyboard.add_hotkey("F2", toggle_config_mode)
 keyboard.add_hotkey("F11", restore_last_backup)
 keyboard.add_hotkey("F12", remove_color_from_data)
 
-time.sleep(2)
-update_colors()
+time.sleep(2) # For the .2 logo to stay on
 
 # Start Playback Polling
 dot2_ws.on("playbacks", handle_playbacks)
+update_colors()
+
 periodic_playback_poll_thread = threading.Thread(target=periodic_playback_poll, daemon=True)
 periodic_playback_poll_thread.start()
 
