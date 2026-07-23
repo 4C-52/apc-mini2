@@ -10,6 +10,7 @@ import json
 import time
 import shutil
 import keyboard
+import threading
 
 MIDI_INPORT_DEVICE1 = ""
 MIDI_OUTPORT_DEVICE1 = ""
@@ -20,16 +21,21 @@ DEFAULT_MIDI_INPORT_DEVICE1 = ""
 DEFAULT_MIDI_OUTPORT_DEVICE1 = ""
 DEFAULT_MIDI_INPORT_DEVICE2= ""
 DEFAULT_MIDI_OUTPORT_DEVICE2 = ""
+inverted_devices = False
 
-FADER_NOTES = (81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98)
-NORMAL_BUTTON_NOTES = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63)
+FADER_NOTES = tuple(range(81,99))
+NORMAL_BUTTON_NOTES = tuple(range(65))
 SPECIAL_BUTTON_NOTES = (100, 101, 102, 103, 104, 105, 106, 107, 112, 113, 114, 115, 116, 117, 118, 119)
 SHIFT_KEY = 122
 
 note_executor_dictionary_device1 = {}
 note_executor_dictionary_device2 = {}
-BUTTON_COLORS_DEVICE1 = [107, 108, 96, 84, 60, 106, 120, 5, 89, 28, 29, 90, 77, 94, 57, 56, 105, 63, 111, 110, 73, 16, 20, 24, 97, 62, 100, 99, 109, 12, 113, 8, 64, 76, 21, 25, 75, 98, 74, 13, 104, 69, 41, 66, 68, 65, 102, 101, 93, 115, 70, 3, 117, 71, 112, 103, 114, 32, 36, 40, 91, 92, 44, 48]
-BUTTON_COLORS_DEVICE2 = BUTTON_COLORS_DEVICE1
+executor_note_dictionary = {}
+executor_states = set()
+temporary_exec_states = set()
+
+BUTTON_COLORS_DEVICE1 = list(range(0, 65))
+BUTTON_COLORS_DEVICE2 = list(range(65,128))
 DEFAULT_BRIGHTNESS_LEVEL = 6
 DEFAULT_BLINK_CHANNEL = 10
 
@@ -38,12 +44,26 @@ HOST = "192.168.0.6"
 USERNAME = "remote"
 PLAINTEXT_PASSWORD = "1"
 HEARTBEAT_STEP = 10
+PERIODIC_PLAYBACK_INTERVAL = 3 # in seconds
+BWING_START_INDEX=[300, 400, 500, 600, 700, 800]
+BWING_ITEMS_COUNT=[16, 16, 16, 16, 16, 16]
+BWING_ITEMS_TYPE=[3, 3, 3, 3, 3, 3]
+BWING_VIEW=3
+BWING_EXEC_VIEW_MODE=2
 
-START_INDEX = [0, 100, 200, 300, 400, 500, 600, 700, 800]
-ITEMS_COUNT = [22, 22, 22, 16, 16, 16, 16, 16, 16]
+FWING_START_INDEX=[0, 100, 200]
+FWING_ITEMS_COUNT=[22, 22, 22]
+FWING_ITEMS_TYPE=[2, 3, 3]
+FWING_VIEW=2
+FWING_EXEC_VIEW_MODE=1
 
 CONFIG_MODE = 1
 DATA_FILEPATH = "data.json"
+
+
+###################################################
+#                   Tools/Utils                   #
+###################################################
 
 def input(prompt=""):
     root = tk.Tk()
@@ -52,6 +72,75 @@ def input(prompt=""):
     print(result)
     root.destroy()
     return result
+
+def invert_devices():
+    global MIDI_INPORT_DEVICE1, MIDI_INPORT_DEVICE2, MIDI_OUTPORT_DEVICE1, MIDI_OUTPORT_DEVICE2, inverted_devices
+
+    MIDI_INPORT_DEVICE1, MIDI_INPORT_DEVICE2 = MIDI_INPORT_DEVICE2, MIDI_INPORT_DEVICE1
+    MIDI_OUTPORT_DEVICE1, MIDI_OUTPORT_DEVICE2 = MIDI_OUTPORT_DEVICE2, MIDI_OUTPORT_DEVICE1
+
+    inverted_devices = not inverted_devices
+    set_correct_bmt_preset()
+
+    update_colors()
+
+def get_last_backup(backup_directory_path):
+    backups = glob.glob(os.path.join(backup_directory_path, "data_backup_*.json"))
+    if not backups:
+        return None
+    backups.sort()  # timestamp format YYYY-MM-DD_HH-MM sorts correctly as strings
+    return backups[-1]
+
+def restore_last_backup(filepath=DATA_FILEPATH):
+
+    backup_directory_path = os.path.join(os.path.dirname(os.path.abspath(filepath)), "backups")
+    last_backup = get_last_backup(backup_directory_path)
+
+    if not last_backup:
+        print("No backup found to restore.")
+        return
+
+    if input(f"Are you sure you want to load the last backup?(Y/N) \nYOUR CURRENT COLORS WILL BE OVERWRITTEN.").lower() == "y":
+        if input(f"Type \"CONFIRM\" to load the last backup. Your current file will be LOST.") != "CONFIRM":
+            return
+    else:
+        return
+
+    shutil.copy2(last_backup, filepath)
+
+    load_json()
+    update_colors()
+
+def initiate_executor_note_dictionary():
+    global executor_note_dictionary, note_executor_dictionary_device1, note_executor_dictionary_device2
+
+    executor_note_dictionary = {}
+    # Organized as such : {"executor_id": [[note, device_id], [note, device_id]... ], executor_id:[[note, device_id]], ...}
+    # This allows for multiple notes to be mapped to the same executor
+
+    for note in note_executor_dictionary_device1.keys():
+        executor = note_executor_dictionary_device1[note]["executor_index"]
+        if executor not in executor_note_dictionary.keys():
+            executor_note_dictionary[executor] = []
+        executor_note_dictionary[executor].append([note, 1])
+
+    for note in note_executor_dictionary_device2.keys():
+        executor = note_executor_dictionary_device2[note]["executor_index"]
+        if executor not in executor_note_dictionary.keys():
+            executor_note_dictionary[executor] = []
+        executor_note_dictionary[executor].append([note, 2])
+
+def set_correct_bmt_preset():
+    global inverted_devices
+
+    if inverted_devices:
+        send_midi_message("note_on", 0, 127, 67)
+    else:
+        send_midi_message("note_on", 0, 127, 69)
+
+###################################################
+#                      JSON                       #
+###################################################
 
 def load_json():
     global CONFIG_MODE, note_executor_dictionary_device1, note_executor_dictionary_device2, DEFAULT_BRIGHTNESS_LEVEL, PLAINTEXT_PASSWORD, HOST, DEFAULT_BLINK_CHANNEL, DEFAULT_MIDI_INPORT_DEVICE1, DEFAULT_MIDI_INPORT_DEVICE2, DEFAULT_MIDI_OUTPORT_DEVICE1, DEFAULT_MIDI_OUTPORT_DEVICE2
@@ -143,14 +232,6 @@ def set_default_devices(device1_input="", device1_output="", device2_input="", d
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
-def invert_devices():
-    global MIDI_INPORT_DEVICE1, MIDI_INPORT_DEVICE2, MIDI_OUTPORT_DEVICE1, MIDI_OUTPORT_DEVICE2
-
-    MIDI_INPORT_DEVICE1, MIDI_INPORT_DEVICE2 = MIDI_INPORT_DEVICE2, MIDI_INPORT_DEVICE1
-    MIDI_OUTPORT_DEVICE1, MIDI_OUTPORT_DEVICE2 = MIDI_OUTPORT_DEVICE2, MIDI_OUTPORT_DEVICE1
-
-    update_colors()
-
 def toggle_config_mode(filepath=DATA_FILEPATH):
     global CONFIG_MODE
 
@@ -169,45 +250,68 @@ def toggle_config_mode(filepath=DATA_FILEPATH):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
-def flash_color(duration, color):
-    set_all_pads(velocity=color, channel=11)
-    time.sleep(duration)
+def remove_color_from_data(filepath=DATA_FILEPATH):
+    flash_color(2, 120)
+    with open(filepath, "r") as f:
+        data = json.load(f)
+    if input(f"Are you sure you want to remove all colors?(Y/N) \nA backup will be created.").lower() == "y":
+        if input(f"Type \"CONFIRM\" to remove all colors from the stored data.") != "CONFIRM":
+            return
+    else:
+        return
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%Hh%M")  # no colons!
+
+    base_dir = os.path.dirname(os.path.abspath(filepath))
+    backup_directory_path = os.path.join(base_dir, "backups")
+    backup_filepath = os.path.join(backup_directory_path, f"data_backup_{timestamp}.json")
+
+    os.makedirs(backup_directory_path, exist_ok=True)
+    shutil.copy2(filepath, backup_filepath)
+
+    with open(filepath, "r") as f:
+        data = json.load(f)
+
+    for note in data["note_executor_dictionary_device1"].keys():
+        data["note_executor_dictionary_device1"][str(note)]["color"] = -1
+    for note in data["note_executor_dictionary_device2"].keys():
+        data["note_executor_dictionary_device2"][str(note)]["color"] = -1
+
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
+
+    load_json()
     update_colors()
 
-#WIP
-def handle_playbacks(data):
+def link_executor_note(note, device_id):
     """
-    Triggers when dot2_ws.poll_exec_state() is called and parses data to output a dictionary in this format :
-    {"Exec_id": True, ...}
-    True if the exec is on in Dot2
-    Does not contain off execs
-    :param data:
-    :return:
+    Updates the data.json file
+    :param note -> the MIDI note number to link
+    :param device_id -> the device ID to link the executor to, check GitHub to know device IDs
     """
-    execs_states = {}
-    print("O"*50, data)
-    items_group = data["itemGroups"]
-    for exec_line in items_group:
-        print(exec_line, "exec line")
-        i_exec_off = exec_line["iExecOff"]
-        for exec_struct in exec_line["items"]:
-            print("exec", exec_struct)
-            exec_id = exec_struct[0]["i"]["t"]
-            if int(exec_id) < i_exec_off:
-                exec_id = int(exec_id) + i_exec_off
-            if exec_struct[0]['cues'] != {}:
+    if device_id == 1 and str(note) in note_executor_dictionary_device1.keys():
+        executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
+    elif device_id == 2 and str(note) in note_executor_dictionary_device2.keys():
+        executor_index = note_executor_dictionary_device2[str(note)]["executor_index"]
+    else:
+        temp = input("Please input the id of the executor")
+        if temp is None:
+            return
+        executor_index = int(temp) - 1
 
-                exec_cues = exec_struct[0]['cues']["items"][1]['pgs']['v']
-            else:
-                exec_cues = {}
+    if note in NORMAL_BUTTON_NOTES:
+        color = choose_color()
+        append_note_to_json(note, executor_index, device_id=device_id, color=color)
 
-            print("exec cues", exec_cues)
-            print("exec_id", exec_id)
+    elif note in SPECIAL_BUTTON_NOTES or note == SHIFT_KEY:
+        append_note_to_json(note, executor_index, device_id=device_id, color=1)
 
-            if exec_cues>1:
-                execs_states[str(exec_id)] = True
-    print(execs_states)
-    return execs_states
+    load_json()
+    update_colors()
+
+    ###################################################
+    #                      MIDI                       #
+    ###################################################
 
 def select_midi_ports():
     global MIDI_INPORT_DEVICE1, MIDI_INPORT_DEVICE2, MIDI_OUTPORT_DEVICE1, MIDI_OUTPORT_DEVICE2, DEFAULT_MIDI_INPORT_DEVICE1, DEFAULT_MIDI_INPORT_DEVICE2, DEFAULT_MIDI_OUTPORT_DEVICE1, DEFAULT_MIDI_OUTPORT_DEVICE2
@@ -261,108 +365,14 @@ def select_midi_ports():
     set_default_devices(device1_input=DEFAULT_MIDI_INPORT_DEVICE1,device2_input=DEFAULT_MIDI_INPORT_DEVICE2,device1_output=DEFAULT_MIDI_OUTPORT_DEVICE1,device2_output=DEFAULT_MIDI_OUTPORT_DEVICE2)
     print(f"Midi Device IN 1: {MIDI_INPORT_DEVICE1}\nMidi Device IN 2: {MIDI_INPORT_DEVICE2}\nMIDI Device OUT 1: {MIDI_OUTPORT_DEVICE1}\nMIDI Device OUT 2: {MIDI_OUTPORT_DEVICE2}\n")
 
+def flash_color(duration, color):
+    set_all_pads(velocity=color, channel=11)
+    time.sleep(duration)
+    update_colors()
+
 def set_all_pads(velocity=0, channel=DEFAULT_BRIGHTNESS_LEVEL):
     for pad in NORMAL_BUTTON_NOTES:
         send_midi_message(midi_message_type="note_on", channel=channel, note=pad, velocity=velocity)
-
-def remove_color_from_data(filepath=DATA_FILEPATH):
-    if input(f"Are you sure you want to remove all colors?(Y/N) \nA backup will be created.").lower() == "y":
-        if input(f"Type \"CONFIRM\" to remove all colors from the stored data.") != "CONFIRM":
-            return
-    else:
-        return
-
-    timestamp = datetime.now().strftime("%Y-%m-%d_%Hh%M")  # no colons!
-
-    base_dir = os.path.dirname(os.path.abspath(filepath))
-    backup_directory_path = os.path.join(base_dir, "backups")
-    backup_filepath = os.path.join(backup_directory_path, f"data_backup_{timestamp}.json")
-
-    os.makedirs(backup_directory_path, exist_ok=True)
-    shutil.copy2(filepath, backup_filepath)
-
-    with open(filepath, "r") as f:
-        data = json.load(f)
-
-    for note in data["note_executor_dictionary_device1"].keys():
-        data["note_executor_dictionary_device1"][str(note)]["color"] = -1
-    for note in data["note_executor_dictionary_device2"].keys():
-        data["note_executor_dictionary_device2"][str(note)]["color"] = -1
-
-    with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
-
-    load_json()
-    update_colors()
-
-def get_last_backup(backup_directory_path):
-    backups = glob.glob(os.path.join(backup_directory_path, "data_backup_*.json"))
-    if not backups:
-        return None
-    backups.sort()  # timestamp format YYYY-MM-DD_HH-MM sorts correctly as strings
-    return backups[-1]
-
-def restore_last_backup(filepath=DATA_FILEPATH):
-
-    backup_directory_path = os.path.join(os.path.dirname(os.path.abspath(filepath)), "backups")
-    last_backup = get_last_backup(backup_directory_path)
-
-    if not last_backup:
-        print("No backup found to restore.")
-        return
-
-    if input(f"Are you sure you want to load the last backup?(Y/N) \nYOUR CURRENT COLORS WILL BE OVERWRITTEN.").lower() == "y":
-        if input(f"Type \"CONFIRM\" to load the last backup. Your current file will be LOST.") != "CONFIRM":
-            return
-    else:
-        return
-
-    shutil.copy2(last_backup, filepath)
-
-    load_json()
-    update_colors()
-
-def link_executor_note(note, device_id):
-    """
-    Updates the data.json file
-    :param note -> the MIDI note number to link
-    :param device_id -> the device ID to link the executor to, check GitHub to know device IDs
-    """
-    if device_id == 1 and str(note) in note_executor_dictionary_device1.keys():
-        executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
-    elif device_id == 2 and str(note) in note_executor_dictionary_device2.keys():
-        executor_index = note_executor_dictionary_device2[str(note)]["executor_index"]
-    else:
-        temp = input("Please input the id of the executor")
-        if temp is None:
-            return
-        executor_index = int(temp) - 1
-
-    if note in NORMAL_BUTTON_NOTES:
-        color = choose_color()
-        append_note_to_json(note, executor_index, device_id=device_id, color=color)
-
-    elif note in SPECIAL_BUTTON_NOTES or note == SHIFT_KEY:
-        append_note_to_json(note, executor_index, device_id=device_id, color=1)
-
-    load_json()
-    update_colors()
-
-def note_loop(message, device_id):
-    note = message.note
-    if int(note) in FADER_NOTES:
-        return
-
-    if message.type == 'note_on' and CONFIG_MODE:
-        link_executor_note(note, device_id)
-
-    elif device_id == 1 and str(note) in note_executor_dictionary_device1:
-        executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
-        dot2_ws.send_playback_click(executor_index, pressed=message.velocity == 127)
-
-    elif device_id == 2 and str(note) in note_executor_dictionary_device2:
-        executor_index = note_executor_dictionary_device2[str(note)]["executor_index"]
-        dot2_ws.send_playback_click(executor_index, pressed=message.velocity == 127)
 
 def send_midi_message(midi_message_type, channel, note, velocity, device_id=3):
     midi_message = mido.Message(type=str(midi_message_type), channel=int(channel), note=int(note), velocity=int(velocity))
@@ -425,31 +435,177 @@ def update_colors():
 
             elif int(button_note) in SPECIAL_BUTTON_NOTES:
                 send_midi_message(midi_message_type='note_on', channel=0, note=button_note, velocity=1, device_id=device+1) # Channel 0 is the only channel that should be used with special buttons
+    dot2_ws.poll_exec_state()
 
+def set_colors(note_list, color, device_id):
+    for note in note_list:
+        send_midi_message("note_on", DEFAULT_BRIGHTNESS_LEVEL, note, velocity=color, device_id=device_id)
+
+def toggle_blink_note(note, device_id, toggle_on):
+    print(f"toggle-blink_note:\nNote: {note}\nDeviceId: {device_id}\ntoggle_on: {toggle_on}\n\n")
+    if int(note) in SPECIAL_BUTTON_NOTES:
+        if toggle_on:
+            send_midi_message("note_on", 0, note, velocity=2, device_id=device_id)
+        elif not toggle_on:
+            send_midi_message("note_on", 0, note, velocity=1, device_id=device_id)
+    elif int(note) in NORMAL_BUTTON_NOTES:
+        if device_id == 1:
+            color = note_executor_dictionary_device1[str(note)]["color"]
+        elif device_id == 2:
+            color = note_executor_dictionary_device2[str(note)]["color"]
+        else:
+            return
+
+        if color == -1:
+            return
+
+        if toggle_on:
+            send_midi_message("note_on", DEFAULT_BLINK_CHANNEL, note, velocity=color, device_id=device_id)
+        elif not toggle_on:
+            send_midi_message("note_on", DEFAULT_BRIGHTNESS_LEVEL, note, velocity=color, device_id=device_id)
+
+def dot2_logo():
+    set_all_pads(109, 6)
+    set_colors((8,9,11,12,13,14,15,16,17,19,23,28,37,38,47,51,55,60,61,62),3, 1)
+    set_colors((8,11,13,14,15,16,19,22,24,25,26,27,30,32,35,38,40,43,45,46,47), 3, 2)
+
+    ###################################################
+    #                    Playbacks                    #
+    ###################################################
+
+def get_executor_state(data):
+    """
+    Takes the top-level data structure and returns a list of executor ids
+    (from the 'i' field, the on-screen label) that are currently ON (isRun == 1).
+
+    Each entry in data['items'] is itself a list (row) containing one or more
+    executor dicts. We iterate through all of them and check 'isRun'.
+    """
+    running_ids = set()
+    data_type = 0 # 0 If B-Wing, 1 if F-Wing
+    if data.get("responseSubType", None) == 2:
+        data_type = 1
+    items_group = data.get("itemGroups", [])
+    if len(items_group) == 0:
+        return
+
+    for row in items_group:
+        for exec_item in row.get("items", []):
+            exec_id = exec_item[0].get('iExec', None)
+            if exec_item[0].get('isRun') == 1 and exec_id is not None:
+                running_ids.add(exec_id)
+    return running_ids, data_type
+
+def handle_playbacks(data):
+    global executor_states, temporary_exec_states
+    """
+    Takes the top-level data structure and serves as a hub for playback management, including feedback to the controller
+
+    Because of how the websocket is made it is IMPOSSIBLE to get every executor in a single request.
+    Therefore, handle_playbacks is called twice for every playback poll, that is because there are 2 request made by dot2_ws.poll_exec_state()
+    This means that the data received is INCOMPLETE and you must keep that in mind, this data is not absolute.
+    :param data:
+    :return:
+    """
+    current_running_execs, exec_data_type = get_executor_state(data) # exec_data_type == 1 if data received is from F-Wing
+    # F-Wing is always the second set of data to come in, therefore we know we treat the data if exec_data_type is equal to 1
+    if exec_data_type == 0:
+        temporary_exec_states = current_running_execs
+    else:
+        old_exec_states = executor_states
+        current_running_execs = current_running_execs | temporary_exec_states # current_running_execs now contains every executor states
+        print(f"Current running execs: {current_running_execs}")
+        if old_exec_states == current_running_execs: # There's no need to continue if they're the same
+            return
+        old_current_symmetry = old_exec_states ^ current_running_execs # Only keep the ones that are different from each other, ^ is the symmetric difference operand
+
+        for exec in old_current_symmetry:
+            if exec in current_running_execs: # Executor was turned ON
+                for temp in executor_note_dictionary[exec]:
+                    # temp[0] = Note, temp[1] = device ID
+                    print(f"Note ON: {temp[0]}")
+                    toggle_blink_note(temp[0],temp[1], True)
+            else: # Executor was turned OFF
+                for temp in executor_note_dictionary[exec]:
+                    # temp[0] = Note, temp[1] = device ID
+                    print(f"Note OFF: {temp[0]}")
+                    toggle_blink_note(temp[0],temp[1], False)
+        executor_states = current_running_execs
+        temporary_exec_states = set()
+
+def periodic_playback_poll():
+    while True:
+        time.sleep(PERIODIC_PLAYBACK_INTERVAL)
+        dot2_ws.poll_exec_state()
+
+def note_loop(message, device_id):
+    note = message.note
+    if int(note) in FADER_NOTES:
+        return
+
+    if message.type == 'note_on' and CONFIG_MODE:
+        link_executor_note(note, device_id)
+
+    elif device_id == 1 and str(note) in note_executor_dictionary_device1:
+        executor_index = note_executor_dictionary_device1[str(note)]["executor_index"]
+        dot2_ws.send_playback_click(executor_index, pressed=message.velocity == 127)
+        dot2_ws.poll_exec_state()
+
+    elif device_id == 2 and str(note) in note_executor_dictionary_device2:
+        executor_index = note_executor_dictionary_device2[str(note)]["executor_index"]
+        dot2_ws.send_playback_click(executor_index, pressed=message.velocity == 127)
+        dot2_ws.poll_exec_state()
+
+# Load Data
 load_json()
+initiate_executor_note_dictionary()
+select_midi_ports()
+dot2_logo()
 
+# Initiate the connexion
 dot2_ws = Dot2WebSocketHandler(
     host=HOST,
     username=USERNAME,
     password=PLAINTEXT_PASSWORD,
     heartbeat_step=HEARTBEAT_STEP,
-    start_index=START_INDEX,
-    items_count=ITEMS_COUNT
+
+    bwing_start_index=BWING_START_INDEX,
+    bwing_items_count=BWING_ITEMS_COUNT,
+    bwing_items_type= BWING_ITEMS_TYPE,
+    bwing_view=BWING_VIEW,
+    bwing_exec_view_mode=BWING_EXEC_VIEW_MODE,
+
+    fwing_start_index=FWING_START_INDEX,
+    fwing_items_count=FWING_ITEMS_COUNT,
+    fwing_items_type=FWING_ITEMS_TYPE,
+    fwing_view=FWING_VIEW,
+    fwing_exec_view_mode=FWING_EXEC_VIEW_MODE,
+
+    debug=True,
 )
-
-select_midi_ports()
 dot2_ws.connect()
-update_colors()
 
+
+# waits for the websocket
 while not dot2_ws.logged_in:
     time.sleep(0.1)
 
+# Keybinds
 keyboard.add_hotkey("F1", invert_devices)
 keyboard.add_hotkey("F2", toggle_config_mode)
 keyboard.add_hotkey("F11", restore_last_backup)
 keyboard.add_hotkey("F12", remove_color_from_data)
 
+time.sleep(2)
+update_colors()
+
+# Start Playback Polling
+dot2_ws.on("playbacks", handle_playbacks)
+periodic_playback_poll_thread = threading.Thread(target=periodic_playback_poll, daemon=True)
+periodic_playback_poll_thread.start()
+
 while True:
+    #Listen for notes on both devices
     for msg in MIDI_INPORT_DEVICE1.iter_pending():
         note_loop(msg, device_id=1)
 

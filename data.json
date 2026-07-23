@@ -3,7 +3,7 @@
   "default_blink_channel": 10,
   "default_ip_address": "192.168.0.6",
   "dot2_password": "1",
-  "config_mode": 1,
+  "config_mode": 0,
   "DEFAULT_MIDI_INPORT_DEVICE1": "Bome MIDI Translator 1 3",
   "DEFAULT_MIDI_OUTPORT_DEVICE1": "Bome MIDI Translator 1 4",
   "DEFAULT_MIDI_INPORT_DEVICE2": "Bome MIDI Translator 2 4",
@@ -11,67 +11,67 @@
   "note_executor_dictionary_device1": {
     "0": {
       "executor_index": 213,
-      "color": -1
+      "color": 3
     },
     "1": {
       "executor_index": 212,
-      "color": -1
+      "color": 3
     },
     "2": {
       "executor_index": 211,
-      "color": -1
+      "color": 114
     },
     "3": {
       "executor_index": 210,
-      "color": -1
+      "color": 114
     },
     "4": {
       "executor_index": 209,
-      "color": -1
+      "color": 114
     },
     "5": {
       "executor_index": 208,
-      "color": -1
+      "color": 12
     },
     "6": {
       "executor_index": 207,
-      "color": -1
+      "color": 36
     },
     "7": {
       "executor_index": 206,
-      "color": -1
+      "color": 52
     },
     "8": {
       "executor_index": 113,
-      "color": -1
+      "color": 117
     },
     "9": {
       "executor_index": 112,
-      "color": -1
+      "color": 117
     },
     "10": {
       "executor_index": 111,
-      "color": -1
+      "color": 32
     },
     "11": {
       "executor_index": 110,
-      "color": -1
+      "color": 32
     },
     "12": {
       "executor_index": 109,
-      "color": -1
+      "color": 32
     },
     "13": {
       "executor_index": 108,
-      "color": -1
+      "color": 5
     },
     "14": {
       "executor_index": 107,
-      "color": -1
+      "color": 61
     },
     "15": {
       "executor_index": 106,
-      "color": -1
+      "color": 28
     },
     "16": {
       "executor_index": 807,
@@ -107,71 +107,71 @@
     },
     "24": {
       "executor_index": 707,
-      "color": -1
+      "color": 3
     },
     "25": {
       "executor_index": 706,
-      "color": -1
+      "color": 94
     },
     "26": {
       "executor_index": 705,
-      "color": -1
+      "color": 36
     },
     "27": {
       "executor_index": 704,
-      "color": -1
+      "color": 13
     },
     "28": {
       "executor_index": 703,
-      "color": -1
+      "color": 41
     },
     "29": {
       "executor_index": 702,
-      "color": -1
+      "color": 21
     },
     "30": {
       "executor_index": 701,
-      "color": -1
+      "color": 84
     },
     "31": {
       "executor_index": 700,
-      "color": -1
+      "color": 5
     },
     "32": {
       "executor_index": 607,
-      "color": -1
+      "color": 8
     },
     "33": {
       "executor_index": 606,
-      "color": -1
+      "color": 48
     },
     "34": {
       "executor_index": 605,
-      "color": -1
+      "color": 91
     },
     "35": {
       "executor_index": 604,
-      "color": -1
+      "color": 74
     },
     "36": {
       "executor_index": 603,
-      "color": -1
+      "color": 92
     },
     "37": {
       "executor_index": 602,
-      "color": -1
+      "color": 75
     },
     "38": {
       "executor_index": 601,
-      "color": -1
+      "color": 96
     },
     "39": {
       "executor_index": 600,
-      "color": -1
+      "color": 106
     },
     "40": {
       "executor_index": 507,
-      "color": -1
+      "color": 8
     },
     "41": {
       "executor_index": 506,
@@ -203,35 +203,35 @@
     },
     "48": {
       "executor_index": 407,
-      "color": -1
+      "color": 3
     },
     "49": {
       "executor_index": 406,
-      "color": -1
+      "color": 94
     },
     "50": {
       "executor_index": 405,
-      "color": -1
+      "color": 36
     },
     "51": {
       "executor_index": 404,
-      "color": -1
+      "color": 13
     },
     "52": {
       "executor_index": 403,
-      "color": -1
+      "color": 41
     },
     "53": {
       "executor_index": 402,
-      "color": -1
+      "color": 21
     },
     "54": {
       "executor_index": 401,
-      "color": -1
+      "color": 84
     },
     "55": {
       "executor_index": 400,
-      "color": -1
+      "color": 5
     },
     "56": {
       "executor_index": 307,
@@ -337,23 +337,23 @@
   "note_executor_dictionary_device2": {
     "0": {
       "executor_index": 221,
-      "color": 3
+      "color": 93
     },
     "1": {
       "executor_index": 220,
-      "color": 3
+      "color": 90
     },
     "2": {
       "executor_index": 219,
-      "color": 56
+      "color": 104
     },
     "3": {
       "executor_index": 218,
-      "color": 56
+      "color": 20
     },
     "4": {
       "executor_index": 217,
-      "color": 56
+      "color": -1
     },
     "5": {
       "executor_index": 216,
@@ -365,27 +365,27 @@
     },
     "7": {
       "executor_index": 214,
-      "color": -1
+      "color": 103
     },
     "8": {
       "executor_index": 121,
-      "color": 117
+      "color": 70
     },
     "9": {
       "executor_index": 120,
-      "color": 117
+      "color": 114
     },
     "10": {
       "executor_index": 119,
-      "color": 57
+      "color": 69
     },
     "11": {
       "executor_index": 118,
-      "color": 57
+      "color": 110
     },
     "12": {
       "executor_index": 117,
-      "color": 57
+      "color": -1
     },
     "13": {
       "executor_index": 116,
@@ -401,67 +401,67 @@
     },
     "16": {
       "executor_index": 815,
-      "color": -1
+      "color": 5
     },
     "17": {
       "executor_index": 814,
-      "color": -1
+      "color": 60
     },
     "18": {
       "executor_index": 813,
-      "color": -1
+      "color": 84
     },
     "19": {
       "executor_index": 812,
-      "color": -1
+      "color": 13
     },
     "20": {
       "executor_index": 811,
-      "color": -1
+      "color": 98
     },
     "21": {
       "executor_index": 810,
-      "color": -1
+      "color": 25
     },
     "22": {
       "executor_index": 809,
-      "color": -1
+      "color": 40
     },
     "23": {
       "executor_index": 808,
-      "color": -1
+      "color": 91
     },
     "24": {
       "executor_index": 715,
-      "color": -1
+      "color": 5
     },
     "25": {
       "executor_index": 714,
-      "color": -1
+      "color": 60
     },
     "26": {
       "executor_index": 713,
-      "color": -1
+      "color": 84
     },
     "27": {
       "executor_index": 712,
-      "color": -1
+      "color": 13
     },
     "28": {
       "executor_index": 711,
-      "color": -1
+      "color": 98
     },
     "29": {
       "executor_index": 710,
-      "color": -1
+      "color": 25
     },
     "30": {
       "executor_index": 709,
-      "color": -1
+      "color": 40
     },
     "31": {
       "executor_index": 708,
-      "color": -1
+      "color": 91
     },
     "32": {
       "executor_index": 615,
@@ -659,6 +659,5 @@
       "executor_index": 3,
       "color": 1
     }
-  },
-  "CONFIG_MODE": true
+  }
 }

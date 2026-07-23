@@ -5,7 +5,25 @@ import threading
 import websocket
 
 class Dot2WebSocketHandler:
-    def __init__(self, host="10.0.0.50", username="remote", password="1", heartbeat_step=10, debug=True, start_index=[0, 100, 200, 300, 400, 500, 600, 700, 800], items_count=[22, 22, 22, 16, 16, 16, 16, 16, 16]):
+    def __init__(self,
+                 host="10.0.0.50",
+                 username="remote",
+                 password="1",
+                 heartbeat_step=10,
+                 debug=True,
+
+                 bwing_start_index=[300, 400, 500, 600, 700, 800],
+                 bwing_items_count=[16, 16, 16, 16, 16, 16],
+                 bwing_items_type=[3, 3, 3, 3, 3, 3],
+                 bwing_view=3,
+                 bwing_exec_view_mode=2,
+
+                 fwing_start_index=[0, 100, 200],
+                 fwing_items_count=[22, 22, 22],
+                 fwing_items_type=[2, 3, 3],
+                 fwing_view=3,
+                 fwing_exec_view_mode=2,
+                 ):
         self.HOST = host
         self.URL = f"ws://{self.HOST}/?ma=1"
         self.ORIGIN = f"http://{self.HOST}"
@@ -28,8 +46,17 @@ class Dot2WebSocketHandler:
         self._one_shot_callbacks = {}
         self._callbacks_lock = threading.Lock()
 
-        self.START_INDEX = start_index
-        self.ITEMS_COUNT = items_count
+        self.BWING_START_INDEX = bwing_start_index
+        self.BWING_ITEMS_COUNT = bwing_items_count
+        self.BWING_ITEMS_TYPE = bwing_items_type
+        self.BWING_VIEW = bwing_view
+        self.BWING_EXEC_VIEW_MODE = bwing_exec_view_mode
+
+        self.FWING_START_INDEX = fwing_start_index
+        self.FWING_ITEMS_COUNT = fwing_items_count
+        self.FWING_ITEMS_TYPE = fwing_items_type
+        self.FWING_VIEW = fwing_view
+        self.FWING_EXEC_VIEW_MODE = fwing_exec_view_mode
 
     ###################################################
     #                    Callbacks                    #
@@ -247,15 +274,31 @@ class Dot2WebSocketHandler:
             if self.DEBUG:
                 print("No session yet")
             return
+
+        # Poll B-Wings
         self._send({
         "requestType": "playbacks",
-        "startIndex": self.START_INDEX,
-        "itemsCount": self.ITEMS_COUNT,
+        "startIndex": self.BWING_START_INDEX,
+        "itemsCount": self.BWING_ITEMS_COUNT,
         "pageIndex": 0,
-        "itemsType": [3, 3, 3, 3, 3, 3, 3, 3, 3],
-        "view": 3,
-        "execButtonViewMode": 2,
+        "itemsType": self.BWING_ITEMS_TYPE,
+        "view": self.BWING_VIEW,
+        "execButtonViewMode": self.BWING_EXEC_VIEW_MODE,
         "buttonsViewMode": 0,
         "session": self.session_id,
         "maxRequests": 1
     })
+
+        # Poll F-Wings
+        self._send({
+            "requestType": "playbacks",
+            "startIndex": self.FWING_START_INDEX,
+            "itemsCount": self.FWING_ITEMS_COUNT,
+            "pageIndex": 0,
+            "itemsType": self.FWING_ITEMS_TYPE,
+            "view": self.FWING_VIEW,
+            "execButtonViewMode": self.FWING_EXEC_VIEW_MODE,
+            "buttonsViewMode": 0,
+            "session": self.session_id,
+            "maxRequests": 1
+        })
